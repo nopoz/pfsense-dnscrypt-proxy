@@ -107,8 +107,10 @@ forward-zone:
 To use DNSCrypt Proxy directly via **System > General Setup**:
 
 1. Disable DNS Resolver: Go to **Services > DNS Resolver**, uncheck **Enable**, and click **Save**
-2. Configure DNSCrypt Proxy to listen on port **53** (the UI only accepts IP addresses and defaults to port 53)
-3. Go to **System > General Setup** and set DNS Server to `127.0.0.1`
+2. Configure DNSCrypt Proxy to listen on port **53**
+3. Go to **System > General Setup > DNS Server Settings** and set DNS Server to `127.0.0.1`
+
+Note: The pfSense DNS Server Settings only accepts IP addresses and assumes port 53.
 
 ## Building from Source
 
