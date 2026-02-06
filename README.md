@@ -6,9 +6,9 @@ A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/D
 
 ## Installation
 
-### pfSense CE 2.7.x
-
 Run this command in the pfSense shell (via SSH or Console):
+
+### pfSense CE
 
 ```bash
 pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
@@ -19,6 +19,16 @@ pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/d
 ```bash
 pkg-static -C /dev/null add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
+
+### Installing a Specific Version
+
+Replace `latest/download/pfSense-pkg-dnscrypt-proxy.pkg` with `download/vX.X.X/pfSense-pkg-dnscrypt-proxy-X.X.X.pkg`:
+
+```bash
+pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/download/v1.0.0/pfSense-pkg-dnscrypt-proxy-1.0.0.pkg
+```
+
+See all available versions on the [Releases](https://github.com/nopoz/pfsense-dnscrypt-proxy/releases) page.
 
 After installation, navigate to **Services > DNSCrypt Proxy** in the pfSense web interface.
 
