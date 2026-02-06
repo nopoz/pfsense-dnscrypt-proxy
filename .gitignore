@@ -1,0 +1,17 @@
+# Build artifacts
+build/stage/
+build/pkg/
+build/pkg-install
+build/pkg-deinstall
+*.pkg
+*.txz
+
+# Editor and OS files
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-*
+
