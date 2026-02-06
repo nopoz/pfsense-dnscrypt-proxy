@@ -36,8 +36,6 @@ jobs:
         with:
           usesh: true
           release: "14.0"
-          prepare: |
-            pkg install -y # Ensure pkg is available
           run: |
             set -e
 
@@ -83,7 +81,7 @@ jobs:
           body: |
             ## Installation
 
-            ### pfSense CE 2.7.x
+            ### pfSense CE
             ```bash
             pkg-static add https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/pfSense-pkg-dnscrypt-proxy-${{ steps.version.outputs.version }}.pkg
             ```
@@ -98,7 +96,6 @@ jobs:
             pkg delete pfSense-pkg-dnscrypt-proxy
             ```
 
-            ---
             See [README](https://github.com/${{ github.repository }}#readme) for full documentation.
           draft: false
           prerelease: false
