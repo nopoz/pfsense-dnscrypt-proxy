@@ -38,7 +38,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
-          release: "14.0"
+          release: "15.0"
           run: |
             set -e
 
