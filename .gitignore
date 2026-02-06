@@ -1,0 +1,19 @@
+# Build artifacts
+build/stage/
+build/pkg/
+build/pkg-install
+build/pkg-deinstall
+*.pkg
+*.txz
+
+# Editor and OS files
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# Claude Code settings (optional - remove if you want to track these)
+.claude/
