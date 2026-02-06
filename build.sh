@@ -119,7 +119,12 @@ stage_files() {
 generate_manifest() {
     echo "Generating package manifest..."
 
+    # Detect architecture
+    ARCH=$(uname -p)
+
     # UCL manifest for pkg create
+    # Note: We set abi explicitly to avoid OS version mismatch issues between
+    # the build environment and target pfSense installations
     cat > "${BUILD_DIR}/+MANIFEST" <<EOF
 name: "${PORTNAME}"
 version: "${PORTVERSION}"
@@ -127,6 +132,7 @@ origin: "security/${PORTNAME}"
 comment: "pfSense package for DNSCrypt Proxy encrypted DNS client"
 maintainer: "ports@FreeBSD.org"
 prefix: "${PREFIX}"
+abi: "FreeBSD:15:${ARCH}"
 desc: "pfSense package for DNSCrypt Proxy, an encrypted DNS client supporting DNSCrypt v2 and DNS-over-HTTPS protocols."
 www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
