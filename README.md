@@ -84,13 +84,10 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 3. Check **Enable DNSCrypt Proxy**
 4. Select your preferred DNS servers from the **Server Selection** tab
 5. Click **Save**
-6. Configure pfSense to use DNSCrypt Proxy:
-   - Go to **System > General Setup**
-   - Set DNS Server to `127.0.0.1` with port `5353` (or your configured port)
 
-### Using with pfSense DNS Resolver (Unbound)
+### Option A: Use with DNS Resolver (Unbound) - Recommended
 
-To use DNSCrypt Proxy as an upstream for Unbound:
+Forward Unbound queries through DNSCrypt Proxy:
 
 1. Go to **Services > DNS Resolver > General Settings**
 2. Add the following to **Custom options**:
@@ -102,6 +99,16 @@ forward-zone:
     name: "."
     forward-addr: 127.0.0.1@5300
 ```
+
+3. Click **Save** and **Apply Changes**
+
+### Option B: Use as System DNS Directly
+
+To use DNSCrypt Proxy directly via **System > General Setup**:
+
+1. Disable DNS Resolver: Go to **Services > DNS Resolver**, uncheck **Enable**, and click **Save**
+2. Configure DNSCrypt Proxy to listen on port **53** (the UI only accepts IP addresses and defaults to port 53)
+3. Go to **System > General Setup** and set DNS Server to `127.0.0.1`
 
 ## Building from Source
 
