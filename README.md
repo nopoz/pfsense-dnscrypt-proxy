@@ -92,9 +92,16 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 
 To use DNSCrypt Proxy as an upstream for Unbound:
 
-1. Go to **Services > DNS Resolver**
-2. Enable **DNS Query Forwarding**
-3. Add `127.0.0.1@5353` as a custom forwarding server
+1. Go to **Services > DNS Resolver > General Settings**
+2. Add the following to **Custom options**:
+
+```
+server:
+    do-not-query-localhost: no
+forward-zone:
+    name: "."
+    forward-addr: 127.0.0.1@5300
+```
 
 ## Building from Source
 
