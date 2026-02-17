@@ -246,6 +246,22 @@ function dnscrypt_proxy_get_tab_checkboxes() {
 }
 
 /**
+ * Get multi-select fields organized by tab
+ * Multi-selects with no selection are not sent in POST (like unchecked checkboxes)
+ */
+function dnscrypt_proxy_get_tab_multiselects() {
+	return array(
+		'general' => array('listen_interfaces'),
+		'servers' => array('servers_cloudflare', 'servers_quad9', 'servers_google',
+		                   'servers_adguard', 'servers_nextdns', 'servers_mullvad',
+		                   'servers_cisco', 'servers_cleanbrowsing'),
+		'cache' => array(),
+		'logging' => array(),
+		'advanced' => array()
+	);
+}
+
+/**
  * Detect which tab submitted the form based on a unique field from each tab
  */
 function dnscrypt_proxy_detect_current_tab() {
@@ -307,10 +323,11 @@ function dnscrypt_proxy_save_config_late() {
  * Merge POST data with existing config to preserve settings across tabs
  * This populates $_POST with existing values so they're available for save_config_late
  *
- * IMPORTANT: Handles checkboxes specially. In HTML, unchecked checkboxes are NOT sent
- * in POST data. We need to distinguish between:
- * 1. A checkbox that was unchecked on the current tab (should become empty)
- * 2. A checkbox from another tab that wasn't in the form (should preserve existing value)
+ * IMPORTANT: Handles checkboxes and multi-selects specially. In HTML, unchecked
+ * checkboxes and multi-selects with no selection are NOT sent in POST data.
+ * We need to distinguish between:
+ * 1. A field that was cleared on the current tab (should become empty)
+ * 2. A field from another tab that wasn't in the form (should preserve existing value)
  */
 function dnscrypt_proxy_merge_config() {
 	global $_POST;
@@ -324,18 +341,27 @@ function dnscrypt_proxy_merge_config() {
 	// Get checkbox fields organized by tab
 	$tab_checkboxes = dnscrypt_proxy_get_tab_checkboxes();
 
-	// Get checkboxes for the current tab (if detected)
+	// Get multi-select fields organized by tab
+	$tab_multiselects = dnscrypt_proxy_get_tab_multiselects();
+
+	// Get checkboxes and multi-selects for the current tab (if detected)
 	$current_tab_checkboxes = array();
-	if ($current_tab !== null && isset($tab_checkboxes[$current_tab])) {
-		$current_tab_checkboxes = $tab_checkboxes[$current_tab];
+	$current_tab_multiselects = array();
+	if ($current_tab !== null) {
+		if (isset($tab_checkboxes[$current_tab])) {
+			$current_tab_checkboxes = $tab_checkboxes[$current_tab];
+		}
+		if (isset($tab_multiselects[$current_tab])) {
+			$current_tab_multiselects = $tab_multiselects[$current_tab];
+		}
 	}
 
 	// Merge: POST values take precedence, but preserve existing values for fields not in POST
 	foreach (dnscrypt_proxy_get_all_fields() as $field) {
 		if (!isset($_POST[$field])) {
 			// Field is not in POST
-			if (in_array($field, $current_tab_checkboxes)) {
-				// This is a checkbox from the current tab that was unchecked
+			if (in_array($field, $current_tab_checkboxes) || in_array($field, $current_tab_multiselects)) {
+				// This is a checkbox/multi-select from the current tab that was cleared
 				// Explicitly set to empty string to clear the value
 				$_POST[$field] = '';
 			} elseif (isset($existing[$field])) {
