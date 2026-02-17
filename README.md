@@ -166,6 +166,7 @@ This package is also submitted to the official pfSense FreeBSD-ports repository:
 
 - [DNSCrypt Proxy](https://github.com/DNSCrypt/dnscrypt-proxy) - The upstream project
 - [pfSense Redmine #9315](https://redmine.pfsense.org/issues/9315) - Original feature request
+- [Netgate Forum Discussion](https://forum.netgate.com/topic/200181/dnscrypt-proxy-package-available-full-gui-support) - Community discussion and support
 
 ## License
 
