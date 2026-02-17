@@ -123,8 +123,9 @@ generate_manifest() {
     ARCH=$(uname -p)
 
     # UCL manifest for pkg create
-    # Note: We set abi explicitly to avoid OS version mismatch issues between
-    # the build environment and target pfSense installations
+    # Note: We use a wildcard ABI to support both pfSense CE (FreeBSD 15) and
+    # pfSense Plus (FreeBSD 16). This works because dnscrypt-proxy is a
+    # statically-linked Go binary with no libc dependencies.
     cat > "${BUILD_DIR}/+MANIFEST" <<EOF
 name: "${PORTNAME}"
 version: "${PORTVERSION}"
@@ -132,7 +133,7 @@ origin: "security/${PORTNAME}"
 comment: "pfSense package for DNSCrypt Proxy encrypted DNS client"
 maintainer: "ports@FreeBSD.org"
 prefix: "${PREFIX}"
-abi: "FreeBSD:15:${ARCH}"
+abi: "FreeBSD:*:*"
 desc: "pfSense package for DNSCrypt Proxy, an encrypted DNS client supporting DNSCrypt v2 and DNS-over-HTTPS protocols."
 www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
