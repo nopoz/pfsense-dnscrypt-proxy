@@ -101,22 +101,10 @@ if [ -f "${SCRIPT_DIR}/pkg-plist" ]; then
     echo "  pkg-plist -> synced"
 fi
 
-# Sync build directory (excluding generated artifacts)
-mkdir -p "${TARGET_DIR}/build"
-if [ -f "${SCRIPT_DIR}/build/+MANIFEST" ]; then
-    cp "${SCRIPT_DIR}/build/+MANIFEST" "${TARGET_DIR}/build/"
-    echo "  build/+MANIFEST -> synced"
-fi
-if [ -f "${SCRIPT_DIR}/build/plist" ]; then
-    cp "${SCRIPT_DIR}/build/plist" "${TARGET_DIR}/build/"
-    echo "  build/plist -> synced"
-fi
-
-# Sync stage directory if present
-if [ -d "${SCRIPT_DIR}/build/stage" ]; then
-    rm -rf "${TARGET_DIR}/build/stage"
-    cp -r "${SCRIPT_DIR}/build/stage" "${TARGET_DIR}/build/"
-    echo "  build/stage/ -> synced"
+# Remove build directory if it exists (these are generated artifacts)
+if [ -d "${TARGET_DIR}/build" ]; then
+    rm -rf "${TARGET_DIR}/build"
+    echo "  build/ -> removed (generated artifacts)"
 fi
 
 echo ""

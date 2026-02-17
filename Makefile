@@ -2,7 +2,7 @@
 
 PORTNAME=	pfSense-pkg-dnscrypt-proxy
 PORTVERSION=	1.0.2
-CATEGORIES=	security
+CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
 EXTRACT_ONLY=	# empty

@@ -15,3 +15,8 @@ build/pkg-deinstall
 .vscode/
 *.sublime-*
 
+# Hidden tool directories
+.*/
+
+# Local draft files
+*-draft.md

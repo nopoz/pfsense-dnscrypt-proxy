@@ -129,7 +129,7 @@ generate_manifest() {
     cat > "${BUILD_DIR}/+MANIFEST" <<EOF
 name: "${PORTNAME}"
 version: "${PORTVERSION}"
-origin: "security/${PORTNAME}"
+origin: "dns/${PORTNAME}"
 comment: "pfSense package for DNSCrypt Proxy encrypted DNS client"
 maintainer: "ports@FreeBSD.org"
 prefix: "${PREFIX}"
@@ -138,7 +138,7 @@ desc: "pfSense package for DNSCrypt Proxy, an encrypted DNS client supporting DN
 www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
 licenses: ["ISC"]
-categories: ["security"]
+categories: ["dns"]
 EOF
 
     # Generate the plist
