@@ -40,7 +40,18 @@ function dnscrypt_proxy_get_config() {
 }
 
 /**
- * Get the installed dnscrypt-proxy version
+ * Get the package version from pkg info
+ */
+function dnscrypt_proxy_get_pkg_version() {
+	$output = shell_exec("pkg query '%v' pfSense-pkg-dnscrypt-proxy 2>/dev/null");
+	if ($output) {
+		return trim($output);
+	}
+	return 'unknown';
+}
+
+/**
+ * Get the installed dnscrypt-proxy binary version
  * Tries to get from binary, falls back to bundled version constant
  */
 function dnscrypt_proxy_get_version() {

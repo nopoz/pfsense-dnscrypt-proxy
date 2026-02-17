@@ -184,6 +184,12 @@ forward-zone:
 			<type>listtopic</type>
 		</field>
 		<field>
+			<fielddescr>Package Version</fielddescr>
+			<fieldname>pkg_version_display</fieldname>
+			<type>info</type>
+			<description><![CDATA[<span id="pkg-version"></span>]]></description>
+		</field>
+		<field>
 			<fielddescr>DNSCrypt Proxy Version</fielddescr>
 			<fieldname>version_display</fieldname>
 			<type>info</type>
@@ -191,8 +197,12 @@ forward-zone:
 		</field>
 	</fields>
 	<custom_php_after_head_command>
-		$version = dnscrypt_proxy_get_version();
-		echo "&lt;script&gt;document.addEventListener('DOMContentLoaded', function() { var el = document.getElementById('dnscrypt-version'); if (el) el.textContent = " . json_encode($version) . "; });&lt;/script&gt;";
+		$pkg_version = dnscrypt_proxy_get_pkg_version();
+		$binary_version = dnscrypt_proxy_get_version();
+		echo "&lt;script&gt;document.addEventListener('DOMContentLoaded', function() { ";
+		echo "var pkgEl = document.getElementById('pkg-version'); if (pkgEl) pkgEl.textContent = " . json_encode($pkg_version) . "; ";
+		echo "var binEl = document.getElementById('dnscrypt-version'); if (binEl) binEl.textContent = " . json_encode($binary_version) . "; ";
+		echo "});&lt;/script&gt;";
 	</custom_php_after_head_command>
 	<custom_php_install_command>
 		dnscrypt_proxy_install();
