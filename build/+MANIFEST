@@ -1,5 +1,5 @@
 name: "pfSense-pkg-dnscrypt-proxy"
-version: "1.0.2"
+version: "1.0.3"
 origin: "dns/pfSense-pkg-dnscrypt-proxy"
 comment: "pfSense package for DNSCrypt Proxy encrypted DNS client"
 maintainer: "ports@FreeBSD.org"

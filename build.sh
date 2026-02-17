@@ -16,7 +16,7 @@ set -e
 
 # --- Configuration ---
 PORTNAME="pfSense-pkg-dnscrypt-proxy"
-PORTVERSION="${PORTVERSION:-1.0.2}"
+PORTVERSION="${PORTVERSION:-1.0.3}"
 PREFIX="/usr/local"
 DATADIR="${PREFIX}/share/${PORTNAME}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,7 +38,7 @@ usage() {
     echo ""
     echo "Environment variables:"
     echo "  DEPLOY_HOST    pfSense SSH host (default: pf)"
-    echo "  PORTVERSION    Package version (default: 1.0.2)"
+    echo "  PORTVERSION    Package version (default: 1.0.3)"
 }
 
 clean() {
