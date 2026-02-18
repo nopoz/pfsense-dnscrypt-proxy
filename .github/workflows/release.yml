@@ -60,6 +60,10 @@ jobs:
             # Copy package to root for upload
             cp build/pkg/*.pkg ./ || cp build/pkg/*.txz ./
 
+            # Create a non-versioned copy for "latest" download URL
+            cp pfSense-pkg-dnscrypt-proxy-*.pkg pfSense-pkg-dnscrypt-proxy.pkg 2>/dev/null || \
+            cp pfSense-pkg-dnscrypt-proxy-*.txz pfSense-pkg-dnscrypt-proxy.txz 2>/dev/null || true
+
       - name: List built artifacts
         run: |
           echo "=== Built packages ==="
