@@ -32,6 +32,27 @@ See all available versions on the [Releases](https://github.com/nopoz/pfsense-dn
 
 After installation, navigate to **Services > DNSCrypt Proxy** in the pfSense web interface.
 
+> **Note:** This package won't appear under "Installed Packages" since it's installed manually, not from the pfSense repository. It will appear under **Services > DNSCrypt Proxy**, on the Dashboard under **Services Status**, and under **Status > Services**.
+
+### Upgrading
+
+To upgrade to a newer version, use the `-f` (force) flag:
+
+```bash
+pkg-static add -f https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+```
+
+Or delete the existing package first, then install the new version:
+
+```bash
+pkg delete pfSense-pkg-dnscrypt-proxy
+pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+```
+
+Your configuration settings are preserved during upgrades.
+
+> **Note for users on v1.0.3 or earlier:** These versions had a bug where the package didn't register with the pfSense UI automatically. Please upgrade to v1.0.4 or later using the commands above.
+
 ### Uninstall
 
 ```bash
