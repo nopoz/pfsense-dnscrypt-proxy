@@ -51,8 +51,6 @@ pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/d
 
 Your configuration settings are preserved during upgrades.
 
-> **Note for users on v1.0.3 or earlier:** These versions had a bug where the package didn't register with the pfSense UI automatically. Please upgrade to v1.0.4 or later using the commands above.
-
 ### Uninstall
 
 ```bash
