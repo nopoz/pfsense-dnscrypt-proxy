@@ -4,4 +4,8 @@ if [ "${2}" != "POST-INSTALL" ]; then
 	exit 0
 fi
 
-${PKG_ROOTDIR}/usr/local/bin/php -f ${PKG_ROOTDIR}/etc/rc.packages %%PORTNAME%% ${2}
+# Register package with pfSense
+/usr/local/bin/php -f /etc/rc.packages %%PORTNAME%% ${2}
+
+# Restart web GUI to pick up new package menu
+/etc/rc.restart_webgui
