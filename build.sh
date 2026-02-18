@@ -139,6 +139,10 @@ www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
 licenses: ["ISC"]
 categories: ["dns"]
+scripts: {
+    post-install: "#!/bin/sh\n/usr/local/bin/php -f /etc/rc.packages ${PORTNAME} POST-INSTALL\n/etc/rc.restart_webgui",
+    pre-deinstall: "#!/bin/sh\n/usr/local/bin/php -f /etc/rc.packages ${PORTNAME} DEINSTALL"
+}
 EOF
 
     # Generate the plist

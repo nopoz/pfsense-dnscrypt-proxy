@@ -10,3 +10,7 @@ www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
 licenses: ["ISC"]
 categories: ["dns"]
+scripts: {
+    post-install: "#!/bin/sh\n/usr/local/bin/php -f /etc/rc.packages pfSense-pkg-dnscrypt-proxy POST-INSTALL\n/etc/rc.restart_webgui",
+    pre-deinstall: "#!/bin/sh\n/usr/local/bin/php -f /etc/rc.packages pfSense-pkg-dnscrypt-proxy DEINSTALL"
+}
