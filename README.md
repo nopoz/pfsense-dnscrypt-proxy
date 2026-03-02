@@ -20,10 +20,11 @@ A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/D
 
 ## Screenshots
 
-![General Settings](screenshots/general_settings.png)
-
 <details>
-<summary>View all tabs</summary>
+<summary>View screenshots</summary>
+
+### General Settings
+![General Settings](screenshots/general_settings.png)
 
 ### Server Selection
 ![Server Selection](screenshots/server_selection.png)
@@ -182,7 +183,7 @@ cd pfsense-dnscrypt-proxy
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEPLOY_HOST` | `pf` | SSH hostname for pfSense |
-| `PORTVERSION` | `1.1.2` | Package version to build |
+| `PORTVERSION` | `1.2.0` | Package version to build |
 
 ## Related
 

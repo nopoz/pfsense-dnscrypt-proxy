@@ -446,20 +446,6 @@ function dnscrypt_proxy_strip_toml_keys($toml, $keys) {
 function dnscrypt_proxy_validate($post, &$input_errors) {
 	global $_POST;
 
-	// Check for reset confirmation (checkbox in Advanced tab)
-	if (isset($post['reset_defaults']) && $post['reset_defaults'] == 'yes') {
-		// Populate $_POST with all default values
-		// This will cause the form save to write defaults
-		$defaults = dnscrypt_proxy_get_defaults();
-		foreach ($defaults as $key => $value) {
-			$_POST[$key] = $value;
-		}
-		// Clear the reset flag so it doesn't persist
-		unset($_POST['reset_defaults']);
-		log_error("[dnscrypt-proxy] Configuration reset to defaults requested");
-		return; // Skip other validation for reset
-	}
-
 	// Detect current tab BEFORE merge (merge populates $_POST with all
 	// saved fields, which would confuse tab detection)
 	$current_tab = dnscrypt_proxy_detect_current_tab();
@@ -828,6 +814,364 @@ function dnscrypt_proxy_deinstall() {
 	@rmdir('/var/cache/dnscrypt-proxy');
 
 	log_error("[dnscrypt-proxy] Package uninstalled");
+}
+
+/**
+ * Import a TOML configuration and write parsed values into config.xml.
+ *
+ * Parses top-level key=value pairs and known sections from the TOML content,
+ * maps them to config.xml fields, and triggers a sync to regenerate the TOML
+ * and restart the service.
+ *
+ * Returns an array of error strings (empty = success).
+ */
+function dnscrypt_proxy_import_toml($toml_content) {
+	$errors = array();
+
+	// Validate with dnscrypt-proxy -check first
+	$check_errors = dnscrypt_proxy_check_config($toml_content);
+	if (!empty($check_errors)) {
+		return $check_errors;
+	}
+
+	// Parse the TOML content line by line
+	$lines = explode("\n", $toml_content);
+	$current_section = '';
+	$top_level = array();
+	$sections = array();
+
+	foreach ($lines as $line) {
+		$line = trim($line);
+
+		// Skip empty lines and comments
+		if (empty($line) || $line[0] === '#') {
+			continue;
+		}
+
+		// Section header (simple, e.g. [query_log])
+		if (preg_match('/^\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/', $line, $m)) {
+			$current_section = $m[1];
+			if (!isset($sections[$current_section])) {
+				$sections[$current_section] = array();
+			}
+			continue;
+		}
+
+		// Skip nested/complex section headers like [sources.'public-resolvers'] or [static.'name']
+		if (preg_match('/^\[.+\]$/', $line)) {
+			$current_section = '__nested__';
+			continue;
+		}
+
+		// Key = value
+		if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/', $line, $m)) {
+			$key = $m[1];
+			$raw_value = trim($m[2]);
+
+			if ($current_section === '') {
+				$top_level[$key] = $raw_value;
+			} elseif ($current_section !== '__nested__') {
+				$sections[$current_section][$key] = $raw_value;
+			}
+		}
+	}
+
+	// Helper to parse a TOML value
+	$parse_value = function($raw) {
+		if ($raw === 'true') return true;
+		if ($raw === 'false') return false;
+		if (preg_match("/^'(.*)'$/s", $raw, $m)) return $m[1];
+		if (preg_match('/^"(.*)"$/s', $raw, $m)) return $m[1];
+		if (preg_match('/^-?\d+$/', $raw)) return $raw;
+		return $raw;
+	};
+
+	// Helper to parse a TOML array into a PHP array of strings.
+	// Handles both single-line and multi-line arrays.
+	$parse_array = function($raw) use (&$lines) {
+		$items = array();
+		// Single-line: ['val1', 'val2']
+		if (preg_match('/^\[(.+)\]$/s', $raw, $m)) {
+			preg_match_all("/'([^']*)'|\"([^\"]*)\"/", $m[1], $matches);
+			foreach ($matches[1] as $i => $v) {
+				$items[] = $v !== '' ? $v : $matches[2][$i];
+			}
+			return $items;
+		}
+		// Multi-line: raw starts with '[' but no closing ']' on same line.
+		// The caller already captured everything after '=' on the key's line.
+		// We need to find the continuation in the original lines array.
+		return $items;
+	};
+
+	// Second pass: reassemble multi-line arrays before field processing.
+	// Join continuation lines for array values (lines after key = [ until ])
+	$reassembled = array();
+	foreach ($top_level as $key => $raw) {
+		$reassembled[$key] = $raw;
+	}
+	// Re-scan original lines to detect multi-line arrays at top level
+	$current_section_rescan = '';
+	$ml_key = null;
+	$ml_value = '';
+	foreach ($lines as $line) {
+		$line = trim($line);
+		if (empty($line) || $line[0] === '#') {
+			continue;
+		}
+		// When collecting a multi-line array, append lines until we find ']'
+		if ($ml_key !== null) {
+			$ml_value .= ' ' . $line;
+			if (strpos($line, ']') !== false) {
+				$reassembled[$ml_key] = $ml_value;
+				$ml_key = null;
+			}
+			continue;
+		}
+		// Section header
+		if (preg_match('/^\[.+\]$/', $line)) {
+			if (preg_match('/^\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/', $line)) {
+				$current_section_rescan = $line;
+			} else {
+				$current_section_rescan = '__nested__';
+			}
+			continue;
+		}
+		// Skip lines inside sections
+		if ($current_section_rescan !== '') {
+			continue;
+		}
+		// Top-level key=value: check for multi-line array start
+		if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/', $line, $m)) {
+			$raw = trim($m[2]);
+			if (preg_match('/^\[/', $raw) && !preg_match('/\]/', $raw)) {
+				$ml_key = $m[1];
+				$ml_value = $raw;
+			}
+		}
+	}
+	if ($ml_key !== null) {
+		$reassembled[$ml_key] = $ml_value;
+	}
+	$top_level = $reassembled;
+
+	// Start with current config to preserve fields we don't import
+	$config = dnscrypt_proxy_get_config();
+	if (empty($config)) {
+		$config = dnscrypt_proxy_get_defaults();
+	}
+
+	// Preserve enable state
+	$saved_enable = isset($config['enable']) ? $config['enable'] : '';
+
+	// Boolean fields: TOML true → 'on', false → ''
+	$bool_fields = array(
+		'ipv4_servers', 'ipv6_servers', 'dnscrypt_servers', 'doh_servers',
+		'odoh_servers', 'require_dnssec', 'require_nolog', 'require_nofilter',
+		'ignore_system_dns', 'force_tcp', 'http3', 'offline_mode',
+		'cache', 'block_ipv6', 'block_unqualified', 'block_undelegated',
+		'use_syslog', 'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets'
+	);
+
+	// Numeric/string fields that map directly
+	$direct_fields = array(
+		'max_clients', 'timeout', 'keepalive', 'netprobe_timeout',
+		'cert_refresh_delay', 'reject_ttl', 'log_level',
+		'log_files_max_size', 'log_files_max_age', 'log_files_max_backups',
+		'cache_size', 'cache_min_ttl', 'cache_max_ttl',
+		'cache_neg_min_ttl', 'cache_neg_max_ttl'
+	);
+
+	// String fields that need quote stripping
+	$string_fields = array(
+		'lb_strategy', 'blocked_query_response', 'netprobe_address', 'log_file'
+	);
+
+	// Track which keys we've handled
+	$handled_keys = array_merge($bool_fields, $direct_fields, $string_fields,
+		array('listen_addresses', 'server_names', 'disabled_server_names',
+		      'bootstrap_resolvers'));
+
+	// Process boolean fields
+	foreach ($bool_fields as $field) {
+		if (isset($top_level[$field])) {
+			$val = $parse_value($top_level[$field]);
+			$config[$field] = ($val === true) ? 'on' : '';
+		}
+	}
+
+	// Process direct numeric/string fields
+	foreach ($direct_fields as $field) {
+		if (isset($top_level[$field])) {
+			$config[$field] = $parse_value($top_level[$field]);
+		}
+	}
+
+	// Process string fields
+	foreach ($string_fields as $field) {
+		if (isset($top_level[$field])) {
+			$config[$field] = $parse_value($top_level[$field]);
+		}
+	}
+
+	// listen_addresses → extract port from first entry
+	if (isset($top_level['listen_addresses'])) {
+		$addrs = $parse_array($top_level['listen_addresses']);
+		if (!empty($addrs)) {
+			$first = $addrs[0];
+			if (preg_match('/]:(\d+)$/', $first, $m)) {
+				$config['listen_port'] = $m[1];
+			} elseif (preg_match('/:(\d+)$/', $first, $m)) {
+				$config['listen_port'] = $m[1];
+			}
+		}
+	}
+
+	// bootstrap_resolvers → join with ', '
+	if (isset($top_level['bootstrap_resolvers'])) {
+		$resolvers = $parse_array($top_level['bootstrap_resolvers']);
+		if (!empty($resolvers)) {
+			$config['bootstrap_resolvers'] = implode(', ', $resolvers);
+		}
+	}
+
+	// server_names → set manual mode, put all into additional_servers
+	// Absent server_names → auto mode
+	if (isset($top_level['server_names'])) {
+		$names = $parse_array($top_level['server_names']);
+		if (!empty($names)) {
+			$config['server_selection_mode'] = 'manual';
+			$provider_fields = array(
+				'servers_cloudflare', 'servers_quad9', 'servers_google',
+				'servers_adguard', 'servers_nextdns', 'servers_mullvad',
+				'servers_cisco', 'servers_cleanbrowsing'
+			);
+			foreach ($provider_fields as $pf) {
+				$config[$pf] = '';
+			}
+			$config['additional_servers'] = implode(', ', $names);
+		}
+	} else {
+		$config['server_selection_mode'] = 'auto';
+	}
+
+	// disabled_server_names → join with comma
+	if (isset($top_level['disabled_server_names'])) {
+		$disabled = $parse_array($top_level['disabled_server_names']);
+		$config['disabled_server_names'] = implode(',', $disabled);
+	}
+
+	// [query_log] section
+	if (isset($sections['query_log'])) {
+		$config['query_log'] = 'on';
+		if (isset($sections['query_log']['file'])) {
+			$config['query_log_file'] = $parse_value($sections['query_log']['file']);
+		}
+	} else {
+		$config['query_log'] = '';
+	}
+
+	// [anonymized_dns] section
+	if (isset($sections['anonymized_dns'])) {
+		$config['anon_dns_enable'] = 'on';
+		if (isset($sections['anonymized_dns']['skip_incompatible'])) {
+			$val = $parse_value($sections['anonymized_dns']['skip_incompatible']);
+			$config['anon_dns_skip_incompatible'] = ($val === true) ? 'on' : '';
+		}
+		if (isset($sections['anonymized_dns']['direct_cert_fallback'])) {
+			$val = $parse_value($sections['anonymized_dns']['direct_cert_fallback']);
+			$config['anon_dns_direct_cert_fallback'] = ($val === true) ? 'on' : '';
+		}
+	} else {
+		$config['anon_dns_enable'] = '';
+	}
+
+	// Collect unrecognized top-level keys for custom_toml.
+	// Keys are already validated by dnscrypt_proxy_check_config() above,
+	// so they're syntactically valid TOML that dnscrypt-proxy accepts.
+	$unrecognized = array();
+	foreach ($top_level as $key => $raw) {
+		if (!in_array($key, $handled_keys)) {
+			// Only allow keys with safe names (alphanumeric + underscore)
+			if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $key)) {
+				$unrecognized[] = "{$key} = {$raw}";
+			}
+		}
+	}
+	if (!empty($unrecognized)) {
+		$config['custom_toml'] = base64_encode(implode("\n", $unrecognized));
+	} else {
+		$config['custom_toml'] = '';
+	}
+
+	// Validate imported values the same way the GUI does.
+	// File paths: must be absolute, safe characters, no traversal.
+	foreach (array('log_file', 'query_log_file') as $path_field) {
+		if (!empty($config[$path_field])) {
+			if (!preg_match('#^/[a-zA-Z0-9/._-]+$#', $config[$path_field]) || strpos($config[$path_field], '..') !== false) {
+				$errors[] = "Invalid file path for {$path_field}: " . htmlspecialchars($config[$path_field]);
+			}
+		}
+	}
+
+	// Enum fields
+	if (!empty($config['lb_strategy']) && !in_array($config['lb_strategy'], array('p2', 'ph', 'fastest', 'random'))) {
+		$errors[] = "Invalid load balancing strategy: " . htmlspecialchars($config['lb_strategy']);
+	}
+	if (!empty($config['blocked_query_response']) && !in_array($config['blocked_query_response'], array('hinfo', 'refused', 'empty'))) {
+		$errors[] = "Invalid blocked query response: " . htmlspecialchars($config['blocked_query_response']);
+	}
+	if (isset($config['log_level']) && !in_array((string)$config['log_level'], array('0', '1', '2', '3', '4', '5', '6'))) {
+		$errors[] = "Invalid log level: " . htmlspecialchars($config['log_level']);
+	}
+
+	// Numeric fields: must be integers
+	$numeric_fields = array('max_clients', 'timeout', 'keepalive', 'cert_refresh_delay',
+		'reject_ttl', 'cache_size', 'cache_min_ttl', 'cache_max_ttl',
+		'cache_neg_min_ttl', 'cache_neg_max_ttl', 'log_files_max_size',
+		'log_files_max_age', 'log_files_max_backups', 'listen_port');
+	foreach ($numeric_fields as $nf) {
+		if (isset($config[$nf]) && $config[$nf] !== '' && !preg_match('/^-?\d+$/', (string)$config[$nf])) {
+			$errors[] = "Invalid numeric value for {$nf}: " . htmlspecialchars($config[$nf]);
+		}
+	}
+
+	// Server name lists: only safe characters
+	foreach (array('additional_servers', 'disabled_server_names') as $server_field) {
+		if (!empty($config[$server_field])) {
+			$names = array_map('trim', explode(',', $config[$server_field]));
+			foreach ($names as $name) {
+				if (!empty($name) && !preg_match('/^[a-zA-Z0-9._-]+$/', $name)) {
+					$errors[] = "Invalid server name '{$name}' in {$server_field}.";
+				}
+			}
+		}
+	}
+
+	// Netprobe address: IP or IP:port
+	if (!empty($config['netprobe_address'])) {
+		$npa = $config['netprobe_address'];
+		if (!preg_match('/^[0-9a-fA-F.:]+$/', $npa)) {
+			$errors[] = "Invalid network probe address: " . htmlspecialchars($npa);
+		}
+	}
+
+	// If validation failed, don't write to config.xml
+	if (!empty($errors)) {
+		return $errors;
+	}
+
+	// Restore enable state
+	$config['enable'] = $saved_enable;
+
+	// Write to config.xml
+	config_set_path('installedpackages/dnscryptproxy/config/0', $config);
+	write_config("[dnscrypt-proxy] Configuration imported from TOML");
+
+	// Regenerate TOML and restart service
+	dnscrypt_proxy_sync();
+
+	return $errors;
 }
 
 /**
