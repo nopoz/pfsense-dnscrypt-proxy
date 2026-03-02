@@ -1,6 +1,6 @@
 # pfSense DNSCrypt Proxy Package
 
-A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/DNSCrypt/dnscrypt-proxy), an encrypted DNS client supporting DNSCrypt v2 and DNS-over-HTTPS (DoH) protocols.
+A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/DNSCrypt/dnscrypt-proxy), an encrypted DNS client supporting DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS protocols.
 
 > **Note:** This is a community-maintained package and is not affiliated with or supported by Netgate.
 
@@ -71,13 +71,14 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 ## Features
 
 - **Full GUI Configuration** - 8 configuration tabs accessible from the pfSense web interface
-- **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), and Anonymized DNS
+- **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS with relay routing
 - **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
 - **Custom Resolvers** - Add custom servers via DNS stamps
-- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, validated with `dnscrypt-proxy -check` before saving
-- **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking
-- **Query Logging** - Built-in query log viewer with filtering
+- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, with automatic override of generated keys and validation via `dnscrypt-proxy -check` before saving
+- **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking rules
+- **Query Logging** - Built-in query log viewer with filtering by domain, type, and client IP
 - **Config Viewer** - View, copy, or download the generated TOML configuration
+- **Advanced Tuning** - Load balancing strategies, HTTP/3 (QUIC) support, ephemeral keys, cache size/TTL controls, and log rotation
 - **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)
 - **Service Integration** - Managed via Status > Services like native pfSense services
 
@@ -87,22 +88,28 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 <summary>Click to expand screenshots</summary>
 
 ### General Settings
-![General Settings](https://github.com/user-attachments/assets/27be86ed-8926-429b-a059-7ac20914303b)
+![General Settings](screenshots/general_settings.png)
 
 ### Server Selection
-![Server Selection](https://github.com/user-attachments/assets/5a7c2c95-c3f5-45d3-88f0-ed8a30c6f646)
+![Server Selection](screenshots/server_selection.png)
 
 ### Cache & Filtering
-![Cache Filtering](https://github.com/user-attachments/assets/8e6a3a71-6cc5-4b5e-bbef-f38f8f9d8f59)
+![Cache & Filtering](screenshots/cache_filtering.png)
 
 ### Logging
-![Logging](https://github.com/user-attachments/assets/f1d52162-20db-4d82-87db-a966b2805012)
+![Logging](screenshots/logging.png)
+
+### Lists
+![Lists](screenshots/lists.png)
 
 ### Advanced
-![Advanced](https://github.com/user-attachments/assets/54730fac-da7a-43c7-afb6-36e4ae6d9da5)
+![Advanced](screenshots/advanced.png)
 
 ### Query Log
-![Query Log](https://github.com/user-attachments/assets/c69d180c-50d4-4615-a7e2-e4e88c55bbfe)
+![Query Log](screenshots/query_log.png)
+
+### Config
+![Config](screenshots/config.png)
 
 </details>
 
