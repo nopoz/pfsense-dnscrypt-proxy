@@ -16,7 +16,7 @@ set -e
 
 # --- Configuration ---
 PORTNAME="pfSense-pkg-dnscrypt-proxy"
-PORTVERSION="${PORTVERSION:-1.0.4}"
+PORTVERSION="${PORTVERSION:-1.1.0}"
 PREFIX="/usr/local"
 DATADIR="${PREFIX}/share/${PORTNAME}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,7 +38,7 @@ usage() {
     echo ""
     echo "Environment variables:"
     echo "  DEPLOY_HOST    pfSense SSH host (default: pf)"
-    echo "  PORTVERSION    Package version (default: 1.0.4)"
+    echo "  PORTVERSION    Package version (default: 1.1.0)"
 }
 
 clean() {
@@ -80,6 +80,8 @@ stage_files() {
         "${STAGE_DIR}${PREFIX}/pkg/"
     install -m 0644 "${FILES_DIR}${PREFIX}/share/${PORTNAME}/info.xml" \
         "${STAGE_DIR}${DATADIR}/"
+    install -m 0644 "${FILES_DIR}${PREFIX}/www/dnscrypt-proxy-config.php" \
+        "${STAGE_DIR}${PREFIX}/www/"
     install -m 0644 "${FILES_DIR}${PREFIX}/www/dnscrypt-proxy-querylog.php" \
         "${STAGE_DIR}${PREFIX}/www/"
     install -m 0644 "${FILES_DIR}${PREFIX}/www/shortcuts/pkg_dnscrypt-proxy.inc" \
@@ -160,6 +162,7 @@ pkg/dnscrypt-proxy-logging.xml
 pkg/dnscrypt-proxy-querylog.xml
 pkg/dnscrypt-proxy-servers.xml
 share/pfSense-pkg-dnscrypt-proxy/info.xml
+www/dnscrypt-proxy-config.php
 www/dnscrypt-proxy-querylog.php
 www/shortcuts/pkg_dnscrypt-proxy.inc
 @dir bin/dnscrypt-proxy-bin

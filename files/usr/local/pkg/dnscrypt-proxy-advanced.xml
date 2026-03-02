@@ -61,6 +61,10 @@
 			<text>Query Log</text>
 			<url>/dnscrypt-proxy-querylog.php</url>
 		</tab>
+		<tab>
+			<text>Config</text>
+			<url>/dnscrypt-proxy-config.php</url>
+		</tab>
 	</tabs>
 	<fields>
 		<field>
@@ -281,6 +285,36 @@
 			<type>input</type>
 			<size>10</size>
 			<default_value>1</default_value>
+		</field>
+		<field>
+			<name>Custom Configuration</name>
+			<type>listtopic</type>
+		</field>
+		<field>
+			<fielddescr>Custom Options Info</fielddescr>
+			<fieldname>custom_toml_info</fieldname>
+			<type>info</type>
+			<description>
+				<![CDATA[
+				<div class="alert alert-info">
+				Enter additional dnscrypt-proxy TOML options not exposed in the UI.<br/>
+				<strong>Format:</strong> One option per line, e.g. <code>http3_probe = true</code><br/>
+				Options set here are written before UI-managed values. If you duplicate a UI-managed key,
+				the config check will reject it as a duplicate key error.
+				The full merged configuration is validated with <code>dnscrypt-proxy -check</code> before saving.<br/>
+				Use the <a href="/dnscrypt-proxy-config.php">Config</a> tab to view the complete generated TOML file.
+				</div>
+				]]>
+			</description>
+		</field>
+		<field>
+			<fielddescr>Custom TOML Options</fielddescr>
+			<fieldname>custom_toml</fieldname>
+			<description>Raw TOML options, one per line.</description>
+			<type>textarea</type>
+			<encoding>base64</encoding>
+			<rows>5</rows>
+			<cols>70</cols>
 		</field>
 		<field>
 			<name>Reset Configuration</name>

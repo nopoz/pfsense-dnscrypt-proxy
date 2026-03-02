@@ -70,12 +70,14 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 
 ## Features
 
-- **Full GUI Configuration** - 7 configuration tabs accessible from the pfSense web interface
+- **Full GUI Configuration** - 8 configuration tabs accessible from the pfSense web interface
 - **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), and Anonymized DNS
 - **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
 - **Custom Resolvers** - Add custom servers via DNS stamps
+- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, validated with `dnscrypt-proxy -check` before saving
 - **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking
 - **Query Logging** - Built-in query log viewer with filtering
+- **Config Viewer** - View, copy, or download the generated TOML configuration
 - **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)
 - **Service Integration** - Managed via Status > Services like native pfSense services
 
@@ -174,7 +176,7 @@ cd pfsense-dnscrypt-proxy
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEPLOY_HOST` | `pf` | SSH hostname for pfSense |
-| `PORTVERSION` | `1.0.4` | Package version to build |
+| `PORTVERSION` | `1.1.0` | Package version to build |
 
 ## Upstream PR
 

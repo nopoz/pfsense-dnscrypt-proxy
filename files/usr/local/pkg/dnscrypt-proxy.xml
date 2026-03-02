@@ -74,6 +74,10 @@
 			<text>Query Log</text>
 			<url>/dnscrypt-proxy-querylog.php</url>
 		</tab>
+		<tab>
+			<text>Config</text>
+			<url>/dnscrypt-proxy-config.php</url>
+		</tab>
 	</tabs>
 	<fields>
 		<field>
