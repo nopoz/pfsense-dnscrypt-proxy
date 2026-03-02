@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-dnscrypt-proxy
-PORTVERSION=	1.0.4
+PORTVERSION=	1.1.0
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
@@ -45,6 +45,8 @@ do-install:
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/share/pfSense-pkg-dnscrypt-proxy/info.xml \
 		${STAGEDIR}${DATADIR}
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/dnscrypt-proxy-config.php \
+		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/dnscrypt-proxy-querylog.php \
 		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/shortcuts/pkg_dnscrypt-proxy.inc \
