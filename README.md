@@ -4,6 +4,50 @@ A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/D
 
 > **Note:** This is a community-maintained package and is not affiliated with or supported by Netgate.
 
+## Features
+
+- **Full GUI Configuration** - 8 configuration tabs accessible from the pfSense web interface
+- **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS with relay routing
+- **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
+- **Custom Resolvers** - Add custom servers via DNS stamps
+- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, with automatic override of generated keys and validation via `dnscrypt-proxy -check` before saving
+- **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking rules
+- **Query Logging** - Built-in query log viewer with filtering by domain, type, and client IP
+- **Config Viewer** - View, copy, or download the generated TOML configuration
+- **Advanced Tuning** - Load balancing strategies, HTTP/3 (QUIC) support, ephemeral keys, cache size/TTL controls, and log rotation
+- **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)
+- **Service Integration** - Managed via Status > Services like native pfSense services
+
+## Screenshots
+
+![General Settings](screenshots/general_settings.png)
+
+<details>
+<summary>View all tabs</summary>
+
+### Server Selection
+![Server Selection](screenshots/server_selection.png)
+
+### Cache & Filtering
+![Cache & Filtering](screenshots/cache_filtering.png)
+
+### Logging
+![Logging](screenshots/logging.png)
+
+### Lists
+![Lists](screenshots/lists.png)
+
+### Advanced
+![Advanced](screenshots/advanced.png)
+
+### Query Log
+![Query Log](screenshots/query_log.png)
+
+### Config
+![Config](screenshots/config.png)
+
+</details>
+
 ## Installation
 
 Run this command in the pfSense shell (via SSH or Console):
@@ -51,68 +95,6 @@ pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/d
 
 Your configuration settings are preserved during upgrades.
 
-### Uninstall
-
-```bash
-pkg delete pfSense-pkg-dnscrypt-proxy
-```
-
-### Complete Removal (Troubleshooting)
-
-If normal uninstall doesn't fully clean up, or you need a fresh start:
-
-```bash
-# From your local machine (requires SSH access to pfSense)
-./uninstall.sh pfsense.local
-```
-
-This removes all package files, runtime artifacts, and pfSense registrations while preserving your settings in config.xml.
-
-## Features
-
-- **Full GUI Configuration** - 8 configuration tabs accessible from the pfSense web interface
-- **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS with relay routing
-- **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
-- **Custom Resolvers** - Add custom servers via DNS stamps
-- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, with automatic override of generated keys and validation via `dnscrypt-proxy -check` before saving
-- **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking rules
-- **Query Logging** - Built-in query log viewer with filtering by domain, type, and client IP
-- **Config Viewer** - View, copy, or download the generated TOML configuration
-- **Advanced Tuning** - Load balancing strategies, HTTP/3 (QUIC) support, ephemeral keys, cache size/TTL controls, and log rotation
-- **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)
-- **Service Integration** - Managed via Status > Services like native pfSense services
-
-## Screenshots
-
-<details>
-<summary>Click to expand screenshots</summary>
-
-### General Settings
-![General Settings](screenshots/general_settings.png)
-
-### Server Selection
-![Server Selection](screenshots/server_selection.png)
-
-### Cache & Filtering
-![Cache & Filtering](screenshots/cache_filtering.png)
-
-### Logging
-![Logging](screenshots/logging.png)
-
-### Lists
-![Lists](screenshots/lists.png)
-
-### Advanced
-![Advanced](screenshots/advanced.png)
-
-### Query Log
-![Query Log](screenshots/query_log.png)
-
-### Config
-![Config](screenshots/config.png)
-
-</details>
-
 ## Configuration Guide
 
 ### Basic Setup
@@ -150,6 +132,23 @@ To use DNSCrypt Proxy directly via **System > General Setup**:
 
 Note: The pfSense DNS Server Settings only accepts IP addresses and assumes port 53.
 
+## Uninstall
+
+```bash
+pkg delete pfSense-pkg-dnscrypt-proxy
+```
+
+### Complete Removal (Troubleshooting)
+
+If normal uninstall doesn't fully clean up, or you need a fresh start:
+
+```bash
+# From your local machine (requires SSH access to pfSense)
+./uninstall.sh pfsense.local
+```
+
+This removes all package files, runtime artifacts, and pfSense registrations while preserving your settings in config.xml.
+
 ## Building from Source
 
 Requirements: FreeBSD with `pkg` tools, or a pfSense instance for remote builds.
@@ -185,14 +184,10 @@ cd pfsense-dnscrypt-proxy
 | `DEPLOY_HOST` | `pf` | SSH hostname for pfSense |
 | `PORTVERSION` | `1.1.2` | Package version to build |
 
-## Upstream PR
-
-This package is also submitted to the official pfSense FreeBSD-ports repository:
-- [PR #1434: New Package: DNSCrypt Proxy](https://github.com/pfsense/FreeBSD-ports/pull/1434)
-
 ## Related
 
 - [DNSCrypt Proxy](https://github.com/DNSCrypt/dnscrypt-proxy) - The upstream project
+- [pfSense FreeBSD-ports PR #1434](https://github.com/pfsense/FreeBSD-ports/pull/1434) - Submission to the official pfSense package repository
 - [pfSense Redmine #9315](https://redmine.pfsense.org/issues/9315) - Original feature request
 - [Netgate Forum Discussion](https://forum.netgate.com/topic/200181/dnscrypt-proxy-package-available-full-gui-support) - Community discussion and support
 
