@@ -424,6 +424,14 @@ function dnscrypt_proxy_check_config($toml_content) {
 }
 
 /**
+ * Sanitize a value for use inside TOML single-quoted (literal) strings.
+ * Strips characters that could break or escape out of the quoting context.
+ */
+function dnscrypt_proxy_toml_safe($value) {
+	return str_replace(array("'", "\n", "\r", "\t"), '', $value);
+}
+
+/**
  * Validate user input
  */
 function dnscrypt_proxy_validate($post, &$input_errors) {
@@ -585,6 +593,38 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 		if (!is_numericint($post['log_files_max_backups']) || $post['log_files_max_backups'] < 0) {
 			$input_errors[] = "Max Log Backups must be a non-negative integer.";
 		}
+	}
+
+	// Validate file paths (must be absolute, safe characters, no traversal)
+	foreach (array('log_file', 'query_log_file') as $path_field) {
+		if (!empty($post[$path_field])) {
+			if (!preg_match('#^/[a-zA-Z0-9/._-]+$#', $post[$path_field]) || strpos($post[$path_field], '..') !== false) {
+				$input_errors[] = "Invalid file path for {$path_field}. Must be an absolute path with safe characters and no '..' traversal.";
+			}
+		}
+	}
+
+	// Validate server name lists (comma-separated alphanumeric with ._-)
+	foreach (array('additional_servers', 'disabled_server_names') as $server_field) {
+		if (!empty($post[$server_field])) {
+			$names = array_map('trim', explode(',', $post[$server_field]));
+			foreach ($names as $name) {
+				if (!empty($name) && !preg_match('/^[a-zA-Z0-9._-]+$/', $name)) {
+					$input_errors[] = "Invalid server name '{$name}' in {$server_field}. Only alphanumeric characters, dots, hyphens, and underscores are allowed.";
+				}
+			}
+		}
+	}
+
+	// Validate enum selects
+	if (!empty($post['lb_strategy']) && !in_array($post['lb_strategy'], array('p2', 'ph', 'fastest', 'random'))) {
+		$input_errors[] = "Invalid load balancing strategy.";
+	}
+	if (!empty($post['blocked_query_response']) && !in_array($post['blocked_query_response'], array('hinfo', 'refused', 'empty'))) {
+		$input_errors[] = "Invalid blocked query response type.";
+	}
+	if (!empty($post['log_level']) && !in_array($post['log_level'], array('0', '1', '2', '3', '4', '5', '6'))) {
+		$input_errors[] = "Invalid log level. Must be 0-6.";
 	}
 
 	// Validate custom TOML options (only when advanced tab is submitting)
@@ -966,7 +1006,7 @@ function dnscrypt_proxy_generate_toml() {
 
 	$max_clients = !empty($pkg_config['max_clients']) ? $pkg_config['max_clients'] : '250';
 	$timeout = !empty($pkg_config['timeout']) ? $pkg_config['timeout'] : '5000';
-	$log_level = isset($pkg_config['log_level']) ? $pkg_config['log_level'] : '2';
+	$log_level = isset($pkg_config['log_level']) ? intval($pkg_config['log_level']) : 2;
 
 	// Cache settings
 	$cache_size = !empty($pkg_config['cache_size']) ? $pkg_config['cache_size'] : '4096';
@@ -977,11 +1017,11 @@ function dnscrypt_proxy_generate_toml() {
 
 	// Advanced settings with defaults
 	$keepalive = !empty($pkg_config['keepalive']) ? $pkg_config['keepalive'] : '30';
-	$lb_strategy = !empty($pkg_config['lb_strategy']) ? $pkg_config['lb_strategy'] : 'p2';
+	$lb_strategy = !empty($pkg_config['lb_strategy']) ? dnscrypt_proxy_toml_safe($pkg_config['lb_strategy']) : 'p2';
 	$netprobe_timeout = isset($pkg_config['netprobe_timeout']) ? $pkg_config['netprobe_timeout'] : '60';
 	$netprobe_address = !empty($pkg_config['netprobe_address']) ? $pkg_config['netprobe_address'] : '9.9.9.9:53';
 	$cert_refresh_delay = !empty($pkg_config['cert_refresh_delay']) ? $pkg_config['cert_refresh_delay'] : '240';
-	$blocked_query_response = !empty($pkg_config['blocked_query_response']) ? $pkg_config['blocked_query_response'] : 'hinfo';
+	$blocked_query_response = !empty($pkg_config['blocked_query_response']) ? dnscrypt_proxy_toml_safe($pkg_config['blocked_query_response']) : 'hinfo';
 	$reject_ttl = !empty($pkg_config['reject_ttl']) ? $pkg_config['reject_ttl'] : '10';
 	$log_files_max_size = !empty($pkg_config['log_files_max_size']) ? $pkg_config['log_files_max_size'] : '10';
 	$log_files_max_age = !empty($pkg_config['log_files_max_age']) ? $pkg_config['log_files_max_age'] : '7';
@@ -995,7 +1035,7 @@ function dnscrypt_proxy_generate_toml() {
 		// Manual mode: use selected servers
 		$selected_servers = dnscrypt_proxy_get_selected_servers($pkg_config);
 		if (!empty($selected_servers)) {
-			$server_names = "server_names = ['" . implode("', '", $selected_servers) . "']";
+			$server_names = "server_names = ['" . implode("', '", array_map('dnscrypt_proxy_toml_safe', $selected_servers)) . "']";
 		}
 	}
 	// In auto mode, don't set server_names - dnscrypt-proxy will use any matching server
@@ -1005,7 +1045,7 @@ function dnscrypt_proxy_generate_toml() {
 		$disabled = array_map('trim', explode(',', $pkg_config['disabled_server_names']));
 		$disabled = array_filter($disabled);
 		if (!empty($disabled)) {
-			$server_names .= "\ndisabled_server_names = ['" . implode("', '", $disabled) . "']";
+			$server_names .= "\ndisabled_server_names = ['" . implode("', '", array_map('dnscrypt_proxy_toml_safe', $disabled)) . "']";
 		}
 	}
 
@@ -1020,7 +1060,7 @@ function dnscrypt_proxy_generate_toml() {
 		$bootstrap = $pkg_config['bootstrap_resolvers'];
 	}
 	$bootstrap_list = array_map(function($r) {
-		return "'" . trim($r) . "'";
+		return "'" . dnscrypt_proxy_toml_safe(trim($r)) . "'";
 	}, explode(',', $bootstrap));
 	$bootstrap_str = implode(', ', array_filter($bootstrap_list));
 
@@ -1068,13 +1108,13 @@ function dnscrypt_proxy_generate_toml() {
 	// Log file
 	$log_file_line = '';
 	if (!empty($pkg_config['log_file'])) {
-		$log_file_line = "log_file = '" . $pkg_config['log_file'] . "'\n";
+		$log_file_line = "log_file = '" . dnscrypt_proxy_toml_safe($pkg_config['log_file']) . "'\n";
 	}
 
 	// Query log section
 	$query_log_section = '';
 	if (isset($pkg_config['query_log']) && $pkg_config['query_log'] == 'on') {
-		$query_log_file = !empty($pkg_config['query_log_file']) ? $pkg_config['query_log_file'] : '/var/log/dnscrypt-proxy/query.log';
+		$query_log_file = !empty($pkg_config['query_log_file']) ? dnscrypt_proxy_toml_safe($pkg_config['query_log_file']) : '/var/log/dnscrypt-proxy/query.log';
 		$query_log_section = <<<TOML
 
 [query_log]

@@ -234,7 +234,7 @@ if (empty($entries)): ?>
 						<td><span class="label label-primary"><?=htmlspecialchars($entry['type'])?></span></td>
 						<td><?=htmlspecialchars($entry['server'])?></td>
 						<td><?=htmlspecialchars($entry['latency'])?></td>
-						<td><span class="label label-<?=$status_class?>"><?=htmlspecialchars($entry['status'])?></span></td>
+						<td><span class="label label-<?=htmlspecialchars($status_class)?>"><?=htmlspecialchars($entry['status'])?></span></td>
 					</tr>
 <?php
 	endforeach;
