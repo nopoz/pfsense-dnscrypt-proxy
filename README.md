@@ -26,6 +26,7 @@ A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/D
 ### General Settings
 ![General Settings](screenshots/general_settings.png)
 
+
 ### Server Selection
 ![Server Selection](screenshots/server_selection.png)
 
