@@ -316,36 +316,6 @@
 			<rows>5</rows>
 			<cols>70</cols>
 		</field>
-		<field>
-			<name>Reset Configuration</name>
-			<type>listtopic</type>
-		</field>
-		<field>
-			<fielddescr>Reset to Defaults</fielddescr>
-			<fieldname>reset_info</fieldname>
-			<type>info</type>
-			<description>
-				<![CDATA[
-				<div class="panel panel-danger">
-					<div class="panel-heading">
-						<h3 class="panel-title">
-							<i class="fa fa-exclamation-triangle"></i> Reset All Settings
-						</h3>
-					</div>
-					<div class="panel-body" style="padding-left:15px">
-						<p>This will reset <strong>all DNSCrypt Proxy settings</strong> across all tabs to their default values.</p>
-						<p class="text-danger"><strong>Warning:</strong> This action cannot be undone. Your current configuration will be lost.</p>
-						<div class="checkbox">
-							<label>
-								<input type="checkbox" name="reset_defaults" id="reset_defaults" value="yes">
-								<strong>I understand, reset all settings to defaults</strong>
-							</label>
-						</div>
-					</div>
-				</div>
-				]]>
-			</description>
-		</field>
 	</fields>
 	<custom_php_resync_config_command>
 		dnscrypt_proxy_sync();
