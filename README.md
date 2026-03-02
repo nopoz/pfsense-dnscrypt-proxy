@@ -74,6 +74,7 @@ This removes all package files, runtime artifacts, and pfSense registrations whi
 - **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), and Anonymized DNS
 - **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
 - **Custom Resolvers** - Add custom servers via DNS stamps
+- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, validated with `dnscrypt-proxy -check` before saving
 - **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking
 - **Query Logging** - Built-in query log viewer with filtering
 - **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)

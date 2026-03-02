@@ -190,7 +190,8 @@ function dnscrypt_proxy_get_defaults() {
 		'anon_dns_enable' => '',
 		'anon_dns_routes' => '',
 		'anon_dns_skip_incompatible' => 'on',
-		'anon_dns_direct_cert_fallback' => ''
+		'anon_dns_direct_cert_fallback' => '',
+		'custom_toml' => ''
 	);
 }
 
@@ -235,7 +236,8 @@ function dnscrypt_proxy_get_all_fields() {
 		'disabled_server_names', 'cert_refresh_delay',
 		'cache_neg_min_ttl', 'cache_neg_max_ttl',
 		'blocked_query_response', 'reject_ttl',
-		'log_files_max_size', 'log_files_max_age', 'log_files_max_backups'
+		'log_files_max_size', 'log_files_max_age', 'log_files_max_backups',
+		'custom_toml'
 	);
 }
 
@@ -384,6 +386,44 @@ function dnscrypt_proxy_merge_config() {
 }
 
 /**
+ * Validate a TOML configuration file using dnscrypt-proxy -check
+ * Returns array of error strings (empty = valid)
+ */
+function dnscrypt_proxy_check_config($toml_content) {
+	$errors = array();
+	$tmp_file = '/tmp/dnscrypt-proxy-check.toml';
+
+	file_put_contents($tmp_file, $toml_content);
+
+	$binary = DNSCRYPT_PROXY_BINARY;
+	if (!file_exists($binary) || !is_executable($binary)) {
+		@unlink($tmp_file);
+		return $errors; // Can't validate without binary, allow save
+	}
+
+	$output = '';
+	$retval = 0;
+	exec("{$binary} -check -config {$tmp_file} 2>&1", $output, $retval);
+
+	@unlink($tmp_file);
+
+	if ($retval !== 0) {
+		// Extract ERROR/FATAL lines from output
+		foreach ($output as $line) {
+			if (preg_match('/\[(ERROR|FATAL)\]\s*(.+)/i', $line, $matches)) {
+				$errors[] = "Config check: " . trim($matches[2]);
+			}
+		}
+		// If no specific error lines found, include full output
+		if (empty($errors)) {
+			$errors[] = "Config check failed: " . implode(' ', $output);
+		}
+	}
+
+	return $errors;
+}
+
+/**
  * Validate user input
  */
 function dnscrypt_proxy_validate($post, &$input_errors) {
@@ -402,6 +442,10 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 		log_error("[dnscrypt-proxy] Configuration reset to defaults requested");
 		return; // Skip other validation for reset
 	}
+
+	// Detect current tab BEFORE merge (merge populates $_POST with all
+	// saved fields, which would confuse tab detection)
+	$current_tab = dnscrypt_proxy_detect_current_tab();
 
 	// First merge config to preserve settings from other tabs
 	dnscrypt_proxy_merge_config();
@@ -543,10 +587,42 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 		}
 	}
 
+	// Validate custom TOML options (only when advanced tab is submitting)
+	if ($current_tab == 'advanced' && !empty($post['custom_toml'])) {
+		$custom_raw = $post['custom_toml'];
+		// Basic syntax check: each non-empty, non-comment line must contain '='
+		$custom_lines = explode("\n", $custom_raw);
+		foreach ($custom_lines as $line_num => $line) {
+			$line = trim($line);
+			if (empty($line) || strpos($line, '#') === 0) {
+				continue;
+			}
+			// Allow TOML section headers like [section]
+			if (preg_match('/^\[.+\]$/', $line)) {
+				continue;
+			}
+			if (strpos($line, '=') === false) {
+				$input_errors[] = "Custom TOML: Invalid syntax on line " . ($line_num + 1) . ": '{$line}'. Each option must contain '='.";
+			}
+		}
+
+		// If basic syntax is OK, do a full config check with dnscrypt-proxy -check
+		if (empty($input_errors)) {
+			// Read the current live config file (if it exists) and prepend custom options
+			if (file_exists(DNSCRYPT_PROXY_CONFIG)) {
+				$current_toml = file_get_contents(DNSCRYPT_PROXY_CONFIG);
+				$test_toml = "# Custom options\n" . trim($custom_raw) . "\n\n" . $current_toml;
+				$check_errors = dnscrypt_proxy_check_config($test_toml);
+				foreach ($check_errors as $err) {
+					$input_errors[] = "Custom TOML: {$err}";
+				}
+			}
+		}
+	}
+
 	// Validate anonymized DNS settings (only when servers tab is submitting,
 	// since textarea base64 encoding happens after validation in pkg_edit.php
 	// and values from other tabs come pre-encoded from config)
-	$current_tab = dnscrypt_proxy_detect_current_tab();
 	if ($current_tab == 'servers' && isset($post['anon_dns_enable']) && $post['anon_dns_enable'] == 'on') {
 		// POST textarea value is raw text (not yet base64-encoded)
 		$routes_raw = !empty($post['anon_dns_routes']) ? $post['anon_dns_routes'] : '';
@@ -697,6 +773,15 @@ function dnscrypt_proxy_sync() {
 
 	// Generate list files
 	dnscrypt_proxy_generate_lists();
+
+	// Validate generated config before restarting service
+	if (file_exists(DNSCRYPT_PROXY_CONFIG)) {
+		$check_errors = dnscrypt_proxy_check_config(file_get_contents(DNSCRYPT_PROXY_CONFIG));
+		if (!empty($check_errors)) {
+			log_error("[dnscrypt-proxy] Config validation failed, not restarting service: " . implode('; ', $check_errors));
+			return;
+		}
+	}
 
 	// Manage service state
 	if (dnscrypt_proxy_enabled()) {
@@ -1039,8 +1124,18 @@ TOML;
 	}
 
 	// Build TOML configuration
+	// Prepend custom TOML options (user-supplied freeform options)
+	$custom_toml_block = '';
+	if (!empty($pkg_config['custom_toml'])) {
+		$custom_content = base64_decode($pkg_config['custom_toml']);
+		$custom_content = trim($custom_content);
+		if (!empty($custom_content)) {
+			$custom_toml_block = "# Custom options\n{$custom_content}\n\n";
+		}
+	}
+
 	$toml = <<<TOML
-# DNSCrypt Proxy configuration
+{$custom_toml_block}# DNSCrypt Proxy configuration
 # Generated by pfSense package - do not edit manually
 
 listen_addresses = [{$listen_addresses_str}]
