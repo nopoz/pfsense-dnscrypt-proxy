@@ -32,5 +32,6 @@ $priv_list['page-services-dnscrypt-proxy']['match'][] = "pkg_edit.php?xml=dnscry
 $priv_list['page-services-dnscrypt-proxy']['match'][] = "pkg_edit.php?xml=dnscrypt-proxy-lists.xml*";
 $priv_list['page-services-dnscrypt-proxy']['match'][] = "pkg_edit.php?xml=dnscrypt-proxy-advanced.xml*";
 $priv_list['page-services-dnscrypt-proxy']['match'][] = "dnscrypt-proxy-querylog.php*";
+$priv_list['page-services-dnscrypt-proxy']['match'][] = "dnscrypt-proxy-config.php*";
 
 ?>

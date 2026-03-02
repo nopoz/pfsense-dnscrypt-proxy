@@ -67,6 +67,7 @@ $tab_array[] = array(gettext("Logging"), false, "/pkg_edit.php?xml=dnscrypt-prox
 $tab_array[] = array(gettext("Lists"), false, "/pkg_edit.php?xml=dnscrypt-proxy-lists.xml");
 $tab_array[] = array(gettext("Advanced"), false, "/pkg_edit.php?xml=dnscrypt-proxy-advanced.xml");
 $tab_array[] = array(gettext("Query Log"), true, "/dnscrypt-proxy-querylog.php");
+$tab_array[] = array(gettext("Config"), false, "/dnscrypt-proxy-config.php");
 display_top_tabs($tab_array);
 
 ?>

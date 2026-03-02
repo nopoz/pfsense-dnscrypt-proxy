@@ -60,6 +60,10 @@
 			<url>/dnscrypt-proxy-querylog.php</url>
 			<active/>
 		</tab>
+		<tab>
+			<text>Config</text>
+			<url>/dnscrypt-proxy-config.php</url>
+		</tab>
 	</tabs>
 	<fields>
 	</fields>
