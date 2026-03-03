@@ -21,3 +21,6 @@ build/pkg-deinstall
 
 # Local draft files
 *-draft.md
+
+# Local maintenance scripts
+sync-to-ports.sh
