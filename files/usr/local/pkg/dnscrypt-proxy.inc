@@ -643,27 +643,49 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 
 		// If basic syntax is OK, do a full config check with dnscrypt-proxy -check
 		if (empty($input_errors)) {
-			// Read the current live config file (if it exists) and prepend custom options
+			// Read the current live config file (if it exists) and merge custom options
 			if (file_exists(DNSCRYPT_PROXY_CONFIG)) {
 				$current_toml = file_get_contents(DNSCRYPT_PROXY_CONFIG);
 
-				// Extract top-level keys from custom TOML so we can strip
-				// duplicates from the generated config (custom overrides win)
+				// Strip previous custom blocks from the live config since
+				// we're about to re-add them from the new custom input
+				$current_toml = preg_replace('/^# Custom options\n.*?(?=\n# DNSCrypt Proxy configuration|\z)/ms', '', $current_toml);
+				$current_toml = preg_replace('/\n# Custom sections\n.*/s', '', $current_toml);
+
+				// Split custom TOML into top-level keys and section blocks
+				$val_top = '';
+				$val_sections = '';
 				$override_keys = array();
+				$in_section = false;
 				foreach ($custom_lines as $cline) {
-					$cline = trim($cline);
-					if (empty($cline) || $cline[0] === '#' || $cline[0] === '[') {
-						continue;
+					if (preg_match('/^\s*\[/', $cline)) {
+						$in_section = true;
 					}
-					if (preg_match('/^([a-zA-Z0-9_]+)\s*=/', $cline, $km)) {
-						$override_keys[] = $km[1];
+					if ($in_section) {
+						$val_sections .= $cline . "\n";
+					} else {
+						$val_top .= $cline . "\n";
+						$trimmed = trim($cline);
+						if (!empty($trimmed) && $trimmed[0] !== '#' && preg_match('/^([a-zA-Z0-9_]+)\s*=/', $trimmed, $km)) {
+							$override_keys[] = $km[1];
+						}
 					}
 				}
+
 				if (!empty($override_keys)) {
 					$current_toml = dnscrypt_proxy_strip_toml_keys($current_toml, $override_keys);
 				}
 
-				$test_toml = "# Custom options\n" . trim($custom_raw) . "\n\n" . $current_toml;
+				// Top-level overrides prepended, section blocks appended
+				$test_toml = '';
+				if (!empty(trim($val_top))) {
+					$test_toml .= "# Custom options\n" . $val_top . "\n";
+				}
+				$test_toml .= $current_toml;
+				if (!empty(trim($val_sections))) {
+					$test_toml .= "\n# Custom sections\n" . $val_sections;
+				}
+
 				$check_errors = dnscrypt_proxy_check_config($test_toml);
 				foreach ($check_errors as $err) {
 					$input_errors[] = "Custom TOML: {$err}";
@@ -1534,19 +1556,30 @@ TOML;
 	}
 
 	// Build TOML configuration
-	// Prepend custom TOML options (user-supplied freeform options)
-	$custom_toml_block = '';
+	// Split custom TOML into top-level key overrides (prepended) and
+	// section blocks (appended) so that [section] headers don't capture
+	// the generated top-level keys that follow them.
+	$custom_toml_top = '';
+	$custom_toml_sections = '';
 	$custom_override_keys = array();
 	if (!empty($pkg_config['custom_toml'])) {
 		$custom_content = base64_decode($pkg_config['custom_toml']);
 		$custom_content = trim($custom_content);
 		if (!empty($custom_content)) {
-			$custom_toml_block = "# Custom options\n{$custom_content}\n\n";
-			// Collect top-level keys so we can strip duplicates from generated config
+			$in_section = false;
 			foreach (explode("\n", $custom_content) as $cline) {
-				$cline = trim($cline);
-				if (!empty($cline) && $cline[0] !== '#' && $cline[0] !== '[' && preg_match('/^([a-zA-Z0-9_]+)\s*=/', $cline, $km)) {
-					$custom_override_keys[] = $km[1];
+				if (preg_match('/^\s*\[/', $cline)) {
+					$in_section = true;
+				}
+				if ($in_section) {
+					$custom_toml_sections .= $cline . "\n";
+				} else {
+					$custom_toml_top .= $cline . "\n";
+					// Collect top-level keys so we can strip duplicates from generated config
+					$trimmed = trim($cline);
+					if (!empty($trimmed) && $trimmed[0] !== '#' && preg_match('/^([a-zA-Z0-9_]+)\s*=/', $trimmed, $km)) {
+						$custom_override_keys[] = $km[1];
+					}
 				}
 			}
 		}
@@ -1653,12 +1686,17 @@ TOML;
 	// Create cache directory
 	safe_mkdir('/var/cache/dnscrypt-proxy');
 
-	// Strip generated keys that are overridden by custom TOML, then prepend custom block
+	// Strip generated keys that are overridden by custom TOML top-level keys
 	if (!empty($custom_override_keys)) {
 		$toml = dnscrypt_proxy_strip_toml_keys($toml, $custom_override_keys);
 	}
-	if (!empty($custom_toml_block)) {
-		$toml = $custom_toml_block . $toml;
+	// Prepend top-level custom options (generated keys win by last-write)
+	if (!empty(trim($custom_toml_top))) {
+		$toml = "# Custom options\n" . $custom_toml_top . "\n" . $toml;
+	}
+	// Append custom sections (e.g. [monitoring_ui], [broken_implementations])
+	if (!empty(trim($custom_toml_sections))) {
+		$toml .= "\n# Custom sections\n" . $custom_toml_sections;
 	}
 
 	// Write configuration file
