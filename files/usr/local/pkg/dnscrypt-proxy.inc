@@ -861,39 +861,71 @@ function dnscrypt_proxy_import_toml($toml_content) {
 	$current_section = '';
 	$top_level = array();
 	$sections = array();
+	$section_raw = array(); // raw lines per section for unrecognized section preservation
+	$ml_key_sec = null;     // track multi-line arrays inside sections
+	$ml_val_sec = '';
+	$ml_depth_sec = 0;      // bracket depth for multi-line arrays
 
 	foreach ($lines as $line) {
-		$line = trim($line);
+		$trimmed = trim($line);
 
 		// Skip empty lines and comments
-		if (empty($line) || $line[0] === '#') {
+		if (empty($trimmed) || $trimmed[0] === '#') {
+			continue;
+		}
+
+		// When collecting a multi-line array inside a section, keep appending
+		if ($ml_key_sec !== null) {
+			$ml_val_sec .= ' ' . $trimmed;
+			$ml_depth_sec += substr_count($trimmed, '[') - substr_count($trimmed, ']');
+			if ($ml_depth_sec <= 0) {
+				if ($current_section !== '' && $current_section !== '__nested__') {
+					$sections[$current_section][$ml_key_sec] = $ml_val_sec;
+				}
+				$ml_key_sec = null;
+			}
 			continue;
 		}
 
 		// Section header (simple, e.g. [query_log])
-		if (preg_match('/^\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/', $line, $m)) {
+		if (preg_match('/^\[([a-zA-Z_][a-zA-Z0-9_]*)\]$/', $trimmed, $m)) {
 			$current_section = $m[1];
 			if (!isset($sections[$current_section])) {
 				$sections[$current_section] = array();
+			}
+			if (!isset($section_raw[$current_section])) {
+				$section_raw[$current_section] = array();
 			}
 			continue;
 		}
 
 		// Skip nested/complex section headers like [sources.'public-resolvers'] or [static.'name']
-		if (preg_match('/^\[.+\]$/', $line)) {
+		if (preg_match('/^\[.+\]$/', $trimmed)) {
 			$current_section = '__nested__';
 			continue;
 		}
 
+		// Capture raw lines for section reconstruction
+		if ($current_section !== '' && $current_section !== '__nested__' && isset($section_raw[$current_section])) {
+			$section_raw[$current_section][] = $line;
+		}
+
 		// Key = value
-		if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/', $line, $m)) {
+		if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/', $trimmed, $m)) {
 			$key = $m[1];
 			$raw_value = trim($m[2]);
 
 			if ($current_section === '') {
 				$top_level[$key] = $raw_value;
 			} elseif ($current_section !== '__nested__') {
-				$sections[$current_section][$key] = $raw_value;
+				// Check for multi-line array start (opening [ without balanced ])
+				if (preg_match('/^\[/', $raw_value) && (substr_count($raw_value, '[') > substr_count($raw_value, ']'))) {
+					$ml_key_sec = $key;
+					$ml_val_sec = $raw_value;
+					$ml_depth_sec = substr_count($raw_value, '[') - substr_count($raw_value, ']');
+				} else {
+					$sections[$current_section][$key] = $raw_value;
+				}
 			}
 		}
 	}
@@ -936,15 +968,17 @@ function dnscrypt_proxy_import_toml($toml_content) {
 	$current_section_rescan = '';
 	$ml_key = null;
 	$ml_value = '';
+	$ml_depth = 0;
 	foreach ($lines as $line) {
 		$line = trim($line);
 		if (empty($line) || $line[0] === '#') {
 			continue;
 		}
-		// When collecting a multi-line array, append lines until we find ']'
+		// When collecting a multi-line array, append lines until brackets balance
 		if ($ml_key !== null) {
 			$ml_value .= ' ' . $line;
-			if (strpos($line, ']') !== false) {
+			$ml_depth += substr_count($line, '[') - substr_count($line, ']');
+			if ($ml_depth <= 0) {
 				$reassembled[$ml_key] = $ml_value;
 				$ml_key = null;
 			}
@@ -966,9 +1000,10 @@ function dnscrypt_proxy_import_toml($toml_content) {
 		// Top-level key=value: check for multi-line array start
 		if (preg_match('/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/', $line, $m)) {
 			$raw = trim($m[2]);
-			if (preg_match('/^\[/', $raw) && !preg_match('/\]/', $raw)) {
+			if (preg_match('/^\[/', $raw) && (substr_count($raw, '[') > substr_count($raw, ']'))) {
 				$ml_key = $m[1];
 				$ml_value = $raw;
+				$ml_depth = substr_count($raw, '[') - substr_count($raw, ']');
 			}
 		}
 	}
@@ -1104,19 +1139,51 @@ function dnscrypt_proxy_import_toml($toml_content) {
 			$val = $parse_value($sections['anonymized_dns']['direct_cert_fallback']);
 			$config['anon_dns_direct_cert_fallback'] = ($val === true) ? 'on' : '';
 		}
+		// Parse routes: array of inline tables like { server_name='name', via=['relay1', 'relay2'] }
+		if (isset($sections['anonymized_dns']['routes'])) {
+			$routes_raw = $sections['anonymized_dns']['routes'];
+			$route_lines = array();
+			// Match each inline table: { server_name='...', via=[...] }
+			if (preg_match_all("/\{\s*server_name\s*=\s*'([^']+)'\s*,\s*via\s*=\s*\[([^\]]+)\]\s*\}/", $routes_raw, $rmatches, PREG_SET_ORDER)) {
+				foreach ($rmatches as $rm) {
+					$server = trim($rm[1]);
+					// Extract relay names from the via array
+					$relays = array();
+					if (preg_match_all("/'([^']+)'/", $rm[2], $relay_matches)) {
+						$relays = $relay_matches[1];
+					}
+					if (!empty($relays)) {
+						$route_lines[] = "{$server} = " . implode(', ', $relays);
+					}
+				}
+			}
+			if (!empty($route_lines)) {
+				$config['anon_dns_routes'] = base64_encode(implode("\n", $route_lines));
+			}
+		}
 	} else {
 		$config['anon_dns_enable'] = '';
 	}
 
-	// Collect unrecognized top-level keys for custom_toml.
+	// Collect unrecognized top-level keys and sections for custom_toml.
 	// Keys are already validated by dnscrypt_proxy_check_config() above,
 	// so they're syntactically valid TOML that dnscrypt-proxy accepts.
+	$known_sections = array('query_log', 'anonymized_dns', 'sources');
 	$unrecognized = array();
 	foreach ($top_level as $key => $raw) {
 		if (!in_array($key, $handled_keys)) {
-			// Only allow keys with safe names (alphanumeric + underscore)
 			if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $key)) {
 				$unrecognized[] = "{$key} = {$raw}";
+			}
+		}
+	}
+	// Preserve unrecognized sections (e.g. [monitoring_ui])
+	foreach ($section_raw as $sec_name => $raw_lines) {
+		if (!in_array($sec_name, $known_sections)) {
+			$unrecognized[] = '';
+			$unrecognized[] = "[{$sec_name}]";
+			foreach ($raw_lines as $rl) {
+				$unrecognized[] = $rl;
 			}
 		}
 	}
