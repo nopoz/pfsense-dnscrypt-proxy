@@ -24,3 +24,7 @@ build/pkg-deinstall
 
 # Local maintenance scripts
 sync-to-ports.sh
+
+# Local config/data files
+config-*.xml
+*.toml
