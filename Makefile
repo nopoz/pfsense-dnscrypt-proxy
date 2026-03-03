@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-dnscrypt-proxy
-PORTVERSION=	1.2.0
+PORTVERSION=	1.2.1
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
