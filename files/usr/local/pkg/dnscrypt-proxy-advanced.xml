@@ -299,8 +299,9 @@
 				<div class="alert alert-info">
 				Enter additional dnscrypt-proxy TOML options not exposed in the UI.<br/>
 				<strong>Format:</strong> One option per line, e.g. <code>http3_probe = true</code><br/>
-				Options set here are written before UI-managed values. If you duplicate a UI-managed key,
-				the config check will reject it as a duplicate key error.
+				Top-level options add keys not available in the UI. If a custom key duplicates a UI-managed key, the UI value takes precedence.<br/>
+				TOML section blocks (e.g. <code>[monitoring_ui]</code>) are appended after the generated configuration.
+				Top-level options must appear before any <code>[section]</code> headers.<br/>
 				The full merged configuration is validated with <code>dnscrypt-proxy -check</code> before saving.<br/>
 				Use the <a href="/dnscrypt-proxy-config.php">Config</a> tab to view the complete generated TOML file.
 				</div>

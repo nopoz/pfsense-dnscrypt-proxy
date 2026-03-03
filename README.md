@@ -10,10 +10,10 @@ A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/D
 - **Multiple Protocols** - Supports DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS with relay routing
 - **Popular Providers** - Pre-configured servers from Cloudflare, Quad9, Google, AdGuard, NextDNS, Mullvad, OpenDNS, CleanBrowsing, and more
 - **Custom Resolvers** - Add custom servers via DNS stamps
-- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, with automatic override of generated keys and validation via `dnscrypt-proxy -check` before saving
+- **Custom TOML Options** - Add any dnscrypt-proxy option not exposed in the UI, including TOML section blocks, with validation via `dnscrypt-proxy -check` before saving
 - **Domain Filtering** - Block and allow lists, forwarding rules, and cloaking rules
 - **Query Logging** - Built-in query log viewer with filtering by domain, type, and client IP
-- **Config Viewer** - View, copy, or download the generated TOML configuration
+- **Config Management** - View, copy, download, import (paste or upload), and reset the TOML configuration
 - **Advanced Tuning** - Load balancing strategies, HTTP/3 (QUIC) support, ephemeral keys, cache size/TTL controls, and log rotation
 - **Multi-Architecture** - Supports both amd64 and arm64 (auto-detected)
 - **Service Integration** - Managed via Status > Services like native pfSense services
@@ -184,7 +184,7 @@ cd pfsense-dnscrypt-proxy
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEPLOY_HOST` | `pf` | SSH hostname for pfSense |
-| `PORTVERSION` | `1.2.0` | Package version to build |
+| `PORTVERSION` | `1.2.1` | Package version to build |
 
 ## Related
 
