@@ -29,6 +29,7 @@
 	<title>Services: DNSCrypt Proxy</title>
 	<shortcut_section>dnscrypt-proxy</shortcut_section>
 	<configpath>installedpackages->dnscryptproxy->config</configpath>
+	<addedit_string>[dnscrypt-proxy] Settings saved</addedit_string>
 	<aftersaveredirect>/pkg_edit.php?xml=dnscrypt-proxy-logging.xml</aftersaveredirect>
 	<include_file>/usr/local/pkg/dnscrypt-proxy.inc</include_file>
 	<tabs>
@@ -74,30 +75,34 @@
 		<field>
 			<fielddescr>Log Level</fielddescr>
 			<fieldname>log_level</fieldname>
-			<description>Logging verbosity (0=off to 6=debug)</description>
+			<description>Logging verbosity (0=debug/verbose to 6=fatal only)</description>
 			<type>select</type>
 			<default_value>2</default_value>
 			<options>
-				<option><name>0 - Off</name><value>0</value></option>
-				<option><name>1 - Fatal</name><value>1</value></option>
-				<option><name>2 - Error (default)</name><value>2</value></option>
+				<option><name>0 - Debug (very verbose)</name><value>0</value></option>
+				<option><name>1 - Info</name><value>1</value></option>
+				<option><name>2 - Notice (default)</name><value>2</value></option>
 				<option><name>3 - Warning</name><value>3</value></option>
-				<option><name>4 - Notice</name><value>4</value></option>
-				<option><name>5 - Info</name><value>5</value></option>
-				<option><name>6 - Debug</name><value>6</value></option>
+				<option><name>4 - Error</name><value>4</value></option>
+				<option><name>5 - Critical</name><value>5</value></option>
+				<option><name>6 - Fatal (least verbose)</name><value>6</value></option>
 			</options>
 		</field>
 		<field>
-			<fielddescr>Use Syslog</fielddescr>
-			<fieldname>use_syslog</fieldname>
-			<description>Send log messages to syslog (viewable in Status &gt; System Logs)</description>
-			<type>checkbox</type>
-			<default_value>on</default_value>
+			<fielddescr>Log Destination</fielddescr>
+			<fieldname>log_destination</fieldname>
+			<description>Where to send log messages. Only one can be active at a time.</description>
+			<type>select</type>
+			<default_value>syslog</default_value>
+			<options>
+				<option><name>Syslog (Status &gt; System Logs)</name><value>syslog</value></option>
+				<option><name>Log File</name><value>file</value></option>
+			</options>
 		</field>
 		<field>
-			<fielddescr>Log File</fielddescr>
+			<fielddescr>Log File Path</fielddescr>
 			<fieldname>log_file</fieldname>
-			<description>Optional path to a log file (leave empty to use syslog only)</description>
+			<description>Path to log file. Only used when Log Destination is set to "Log File".</description>
 			<type>input</type>
 			<size>50</size>
 		</field>
@@ -120,6 +125,9 @@
 			<default_value>/var/log/dnscrypt-proxy/query.log</default_value>
 		</field>
 	</fields>
+	<custom_php_after_form_command>
+		dnscrypt_proxy_logging_after_form();
+	</custom_php_after_form_command>
 	<custom_php_resync_config_command>
 		dnscrypt_proxy_sync();
 	</custom_php_resync_config_command>
