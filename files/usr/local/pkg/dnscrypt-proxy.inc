@@ -165,7 +165,7 @@ function dnscrypt_proxy_get_defaults() {
 		'block_unqualified' => 'on',
 		'block_undelegated' => 'on',
 		'log_level' => '2',
-		'use_syslog' => 'on',
+		'log_destination' => 'syslog',
 		'log_file' => '',
 		'query_log' => '',
 		'query_log_file' => '/var/log/dnscrypt-proxy/query.log',
@@ -226,7 +226,7 @@ function dnscrypt_proxy_get_all_fields() {
 		'cache', 'cache_size', 'cache_min_ttl', 'cache_max_ttl',
 		'block_ipv6', 'block_unqualified', 'block_undelegated',
 		// Logging tab
-		'log_level', 'use_syslog', 'log_file', 'query_log', 'query_log_file',
+		'log_level', 'log_destination', 'log_file', 'query_log', 'query_log_file',
 		// Lists tab
 		'blocked_names', 'allowed_names', 'forwarding_rules', 'cloaking_rules',
 		// Advanced tab
@@ -252,7 +252,7 @@ function dnscrypt_proxy_get_tab_checkboxes() {
 		                   'require_dnssec', 'require_nolog', 'require_nofilter',
 		                   'anon_dns_enable', 'anon_dns_skip_incompatible', 'anon_dns_direct_cert_fallback'),
 		'cache' => array('cache', 'block_ipv6', 'block_unqualified', 'block_undelegated'),
-		'logging' => array('use_syslog', 'query_log'),
+		'logging' => array('query_log'),
 		'advanced' => array('force_tcp', 'http3', 'offline_mode', 'odoh_servers',
 		                    'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets')
 	);
@@ -299,6 +299,29 @@ function dnscrypt_proxy_detect_current_tab() {
 	}
 
 	return null;
+}
+
+/**
+ * Inject JavaScript to toggle Log File Path visibility based on Log Destination
+ */
+function dnscrypt_proxy_logging_after_form() {
+?>
+<script type="text/javascript">
+events.push(function() {
+	function toggleLogFile() {
+		var dest = $('select[name="log_destination"]').val();
+		var input = $('input[name="log_file"]');
+		if (dest === 'file') {
+			input.prop('disabled', false);
+		} else {
+			input.prop('disabled', true);
+		}
+	}
+	$('select[name="log_destination"]').on('change', toggleLogFile);
+	toggleLogFile();
+});
+</script>
+<?php
 }
 
 /**
@@ -617,6 +640,12 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 	}
 	if (!empty($post['blocked_query_response']) && !in_array($post['blocked_query_response'], array('hinfo', 'refused', 'empty'))) {
 		$input_errors[] = "Invalid blocked query response type.";
+	}
+	if (!empty($post['log_destination']) && !in_array($post['log_destination'], array('syslog', 'file'))) {
+		$input_errors[] = "Invalid log destination.";
+	}
+	if (isset($post['log_destination']) && $post['log_destination'] === 'file' && empty($post['log_file'])) {
+		$input_errors[] = "Log File Path is required when Log Destination is set to 'Log File'.";
 	}
 	if (!empty($post['log_level']) && !in_array($post['log_level'], array('0', '1', '2', '3', '4', '5', '6'))) {
 		$input_errors[] = "Invalid log level. Must be 0-6.";
@@ -1027,7 +1056,7 @@ function dnscrypt_proxy_import_toml($toml_content) {
 		'odoh_servers', 'require_dnssec', 'require_nolog', 'require_nofilter',
 		'ignore_system_dns', 'force_tcp', 'http3', 'offline_mode',
 		'cache', 'block_ipv6', 'block_unqualified', 'block_undelegated',
-		'use_syslog', 'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets'
+		'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets'
 	);
 
 	// Numeric/string fields that map directly
@@ -1047,7 +1076,7 @@ function dnscrypt_proxy_import_toml($toml_content) {
 	// Track which keys we've handled
 	$handled_keys = array_merge($bool_fields, $direct_fields, $string_fields,
 		array('listen_addresses', 'server_names', 'disabled_server_names',
-		      'bootstrap_resolvers'));
+		      'bootstrap_resolvers', 'use_syslog'));
 
 	// Process boolean fields
 	foreach ($bool_fields as $field) {
@@ -1069,6 +1098,12 @@ function dnscrypt_proxy_import_toml($toml_content) {
 		if (isset($top_level[$field])) {
 			$config[$field] = $parse_value($top_level[$field]);
 		}
+	}
+
+	// use_syslog + log_file → log_destination
+	if (isset($top_level['use_syslog'])) {
+		$val = $parse_value($top_level['use_syslog']);
+		$config['log_destination'] = ($val === true) ? 'syslog' : 'file';
 	}
 
 	// listen_addresses → extract port from first entry
@@ -1545,8 +1580,9 @@ function dnscrypt_proxy_generate_toml() {
 	$block_unqualified = isset($pkg_config['block_unqualified']) && $pkg_config['block_unqualified'] == 'on' ? 'true' : 'false';
 	$block_undelegated = isset($pkg_config['block_undelegated']) && $pkg_config['block_undelegated'] == 'on' ? 'true' : 'false';
 
-	// Boolean settings - Logging
-	$use_syslog = isset($pkg_config['use_syslog']) && $pkg_config['use_syslog'] == 'on' ? 'true' : 'false';
+	// Logging destination - syslog and log_file are mutually exclusive in dnscrypt-proxy
+	$log_destination = isset($pkg_config['log_destination']) ? $pkg_config['log_destination'] : 'syslog';
+	$use_syslog = ($log_destination === 'syslog') ? 'true' : 'false';
 
 	// Boolean settings - Security/privacy
 	$dnscrypt_ephemeral_keys = isset($pkg_config['dnscrypt_ephemeral_keys']) && $pkg_config['dnscrypt_ephemeral_keys'] == 'on' ? 'true' : 'false';
@@ -1562,11 +1598,9 @@ function dnscrypt_proxy_generate_toml() {
 	if (!isset($pkg_config['cache'])) $cache_enabled = 'true';
 	if (!isset($pkg_config['block_unqualified'])) $block_unqualified = 'true';
 	if (!isset($pkg_config['block_undelegated'])) $block_undelegated = 'true';
-	if (!isset($pkg_config['use_syslog'])) $use_syslog = 'true';
-
-	// Log file
+	// Log file - only used when destination is 'file'
 	$log_file_line = '';
-	if (!empty($pkg_config['log_file'])) {
+	if ($log_destination === 'file' && !empty($pkg_config['log_file'])) {
 		$log_file_line = "log_file = '" . dnscrypt_proxy_toml_safe($pkg_config['log_file']) . "'\n";
 	}
 
