@@ -75,17 +75,15 @@
 		<field>
 			<fielddescr>Log Level</fielddescr>
 			<fieldname>log_level</fieldname>
-			<description>Logging verbosity (0=debug/verbose to 6=fatal only)</description>
+			<description>Logging verbosity. Info is useful for troubleshooting; Notice is recommended for normal operation.</description>
 			<type>select</type>
 			<default_value>2</default_value>
 			<options>
-				<option><name>0 - Debug (very verbose)</name><value>0</value></option>
-				<option><name>1 - Info</name><value>1</value></option>
+				<option><name>1 - Info (verbose)</name><value>1</value></option>
 				<option><name>2 - Notice (default)</name><value>2</value></option>
 				<option><name>3 - Warning</name><value>3</value></option>
 				<option><name>4 - Error</name><value>4</value></option>
-				<option><name>5 - Critical</name><value>5</value></option>
-				<option><name>6 - Fatal (least verbose)</name><value>6</value></option>
+				<option><name>5 - Critical (least verbose)</name><value>5</value></option>
 			</options>
 		</field>
 		<field>

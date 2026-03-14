@@ -647,8 +647,8 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 	if (isset($post['log_destination']) && $post['log_destination'] === 'file' && empty($post['log_file'])) {
 		$input_errors[] = "Log File Path is required when Log Destination is set to 'Log File'.";
 	}
-	if (!empty($post['log_level']) && !in_array($post['log_level'], array('0', '1', '2', '3', '4', '5', '6'))) {
-		$input_errors[] = "Invalid log level. Must be 0-6.";
+	if (!empty($post['log_level']) && !in_array($post['log_level'], array('1', '2', '3', '4', '5'))) {
+		$input_errors[] = "Invalid log level. Must be 1-5.";
 	}
 
 	// Validate custom TOML options (only when advanced tab is submitting)
@@ -1245,7 +1245,7 @@ function dnscrypt_proxy_import_toml($toml_content) {
 	if (!empty($config['blocked_query_response']) && !in_array($config['blocked_query_response'], array('hinfo', 'refused', 'empty'))) {
 		$errors[] = "Invalid blocked query response: " . htmlspecialchars($config['blocked_query_response']);
 	}
-	if (isset($config['log_level']) && !in_array((string)$config['log_level'], array('0', '1', '2', '3', '4', '5', '6'))) {
+	if (isset($config['log_level']) && !in_array((string)$config['log_level'], array('1', '2', '3', '4', '5'))) {
 		$errors[] = "Invalid log level: " . htmlspecialchars($config['log_level']);
 	}
 
