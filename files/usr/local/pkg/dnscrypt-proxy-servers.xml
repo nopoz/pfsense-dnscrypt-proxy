@@ -29,6 +29,7 @@
 	<title>Services: DNSCrypt Proxy</title>
 	<shortcut_section>dnscrypt-proxy</shortcut_section>
 	<configpath>installedpackages->dnscryptproxy->config</configpath>
+	<addedit_string>[dnscrypt-proxy] Settings saved</addedit_string>
 	<aftersaveredirect>/pkg_edit.php?xml=dnscrypt-proxy-servers.xml</aftersaveredirect>
 	<include_file>/usr/local/pkg/dnscrypt-proxy.inc</include_file>
 	<tabs>
