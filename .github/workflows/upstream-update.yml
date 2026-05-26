@@ -112,6 +112,16 @@ jobs:
           # Record new upstream version.
           echo "${VER}" > .upstream-version
 
+          # Keep the UI-facing bundled-version constant in sync with the
+          # binary. This is what "DNSCrypt Proxy Version" shows in the GUI
+          # (and is stored as binary_version at install time).
+          sed -i "s/define('DNSCRYPT_PROXY_VERSION', '[^']*')/define('DNSCRYPT_PROXY_VERSION', '${VER}')/" \
+            files/usr/local/pkg/dnscrypt-proxy.inc
+          if ! grep -q "define('DNSCRYPT_PROXY_VERSION', '${VER}')" files/usr/local/pkg/dnscrypt-proxy.inc; then
+            echo "Failed to update DNSCRYPT_PROXY_VERSION constant" >&2
+            exit 1
+          fi
+
           echo "NEWPKG=${NEWPKG}" >> "$GITHUB_ENV"
 
       - name: Open pull request
