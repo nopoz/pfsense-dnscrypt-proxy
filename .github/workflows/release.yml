@@ -25,20 +25,35 @@ jobs:
 
       - name: Extract version from tag
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION}"
           else
             VERSION="${GITHUB_REF#refs/tags/v}"
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building version: ${VERSION}"
+          if [ -f .upstream-version ]; then
+            UPSTREAM=$(tr -d '[:space:]' < .upstream-version)
+          else
+            UPSTREAM="unknown"
+          fi
+          echo "upstream=${UPSTREAM}" >> "$GITHUB_OUTPUT"
+          echo "Bundled dnscrypt-proxy: ${UPSTREAM}"
 
       - name: Build package on FreeBSD
-        uses: vmactions/freebsd-vm@v1
+        uses: vmactions/freebsd-vm@d1e65811565151536c0c894fff74f06351ed26e6  # v1.4.5
+        env:
+          PORTVERSION: ${{ steps.version.outputs.version }}
         with:
           usesh: true
           release: "15.0"
+          # Pass PORTVERSION into the VM as data, not interpolated into the
+          # script body, so the version string can't be shell-injected.
+          envs: 'PORTVERSION'
           run: |
             set -e
 
@@ -47,7 +62,6 @@ jobs:
             pkg --version
 
             echo "=== Setting version ==="
-            export PORTVERSION="${{ steps.version.outputs.version }}"
             echo "Building version: ${PORTVERSION}"
 
             echo "=== Running build script ==="
@@ -67,7 +81,7 @@ jobs:
       - name: List built artifacts
         run: |
           echo "=== Built packages ==="
-          ls -la *.pkg *.txz 2>/dev/null || true
+          ls -la ./*.pkg ./*.txz 2>/dev/null || true
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -80,12 +94,14 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
         with:
           files: |
             *.pkg
             *.txz
           body: |
+            Bundles **dnscrypt-proxy ${{ steps.version.outputs.upstream }}** (upstream).
+
             ## Installation
 
             ### pfSense CE
