@@ -797,15 +797,27 @@ function dnscrypt_proxy_install_binary() {
 		return false;
 	}
 
-	// Copy bundled binary to installation location
-	if (!copy($bundled_binary, DNSCRYPT_PROXY_BINARY)) {
-		log_error("[dnscrypt-proxy] Failed to copy binary to " . DNSCRYPT_PROXY_BINARY);
+	// Copy to a temp file in the same directory, then atomically rename it
+	// over the target. A direct copy() onto DNSCRYPT_PROXY_BINARY fails with
+	// ETXTBSY ("Text file busy") during an upgrade because the dnscrypt-proxy
+	// service is still running the old binary. rename() only swaps the
+	// directory entry, which succeeds while the old inode is still executing
+	// (the running process keeps it until dnscrypt_proxy_sync() restarts it).
+	$tmp_binary = DNSCRYPT_PROXY_BINARY . '.new';
+	if (!copy($bundled_binary, $tmp_binary)) {
+		log_error("[dnscrypt-proxy] Failed to copy binary to " . $tmp_binary);
 		return false;
 	}
 
-	chmod(DNSCRYPT_PROXY_BINARY, 0755);
-	chown(DNSCRYPT_PROXY_BINARY, 'root');
-	chgrp(DNSCRYPT_PROXY_BINARY, 'wheel');
+	chmod($tmp_binary, 0755);
+	chown($tmp_binary, 'root');
+	chgrp($tmp_binary, 'wheel');
+
+	if (!rename($tmp_binary, DNSCRYPT_PROXY_BINARY)) {
+		log_error("[dnscrypt-proxy] Failed to install binary to " . DNSCRYPT_PROXY_BINARY);
+		@unlink($tmp_binary);
+		return false;
+	}
 
 	// Store version in config
 	config_set_path('installedpackages/dnscryptproxy/binary_version', DNSCRYPT_PROXY_VERSION);
