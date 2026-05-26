@@ -36,6 +36,18 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building version: ${VERSION}"
+
+          # Guard against tagging the wrong commit: for tag-triggered releases
+          # the tag version must match PORTVERSION at that commit. (A mismatch
+          # is how v1.2.5 once shipped a stale binary.) Skip for manual dispatch.
+          if [ "${EVENT_NAME}" != "workflow_dispatch" ]; then
+            MK=$(grep '^PORTVERSION=' Makefile | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            if [ "${VERSION}" != "${MK}" ]; then
+              echo "::error::Tag v${VERSION} does not match Makefile PORTVERSION ${MK} at this commit. Tag the commit that contains the version bump." >&2
+              exit 1
+            fi
+          fi
+
           if [ -f .upstream-version ]; then
             UPSTREAM=$(tr -d '[:space:]' < .upstream-version)
           else
