@@ -1,0 +1,137 @@
+name: Check Upstream dnscrypt-proxy
+
+# Watches DNSCrypt/dnscrypt-proxy for new releases. When a newer version
+# exists than the one currently bundled (.upstream-version), it downloads the
+# FreeBSD amd64+arm64 binaries, verifies their minisign signatures, swaps the
+# committed binaries, bumps the package patch version, and opens a PR for review.
+#
+# Release itself is NOT automatic: after merging the PR, push a tag (v<version>)
+# to trigger .github/workflows/release.yml and publish the .pkg.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC
+  workflow_dispatch:        # allow manual runs
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: DNSCrypt/dnscrypt-proxy
+  # Official dnscrypt-proxy release signing key (minisign).
+  # https://github.com/DNSCrypt/dnscrypt-proxy/wiki
+  MINISIGN_PUBKEY: RWTk1xXqcTODeYttYMCMLo0YJHaFEHn7a3akqHlb/7QvIQXHVPxKbjB5
+
+jobs:
+  check:
+    name: Check and update bundled binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine versions
+        id: versions
+        env:
+          # GITHUB_TOKEN raises the API rate limit from 60 to 1000+/hr and is
+          # read-only against the public upstream repo.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          LATEST=$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest" \
+            | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+          CURRENT=$(tr -d '[:space:]' < .upstream-version)
+
+          # Strictly anchor the tag to a plain dotted version. Anything else
+          # (trailing junk, shell metachars, embedded newlines) is rejected, so
+          # an untrusted upstream tag can never reach later shell/output steps.
+          # The newline guard matters because the value is later written to
+          # $GITHUB_OUTPUT/$GITHUB_ENV, where a newline could inject extra vars.
+          if [[ "${LATEST}" == *$'\n'* ]] || ! [[ "${LATEST}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unexpected upstream tag format: '${LATEST}'" >&2
+            exit 1
+          fi
+
+          echo "Latest upstream:   ${LATEST}"
+          echo "Currently bundled: ${CURRENT}"
+
+          echo "latest=${LATEST}"   >> "$GITHUB_OUTPUT"
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+
+          if [ "${LATEST}" = "${CURRENT}" ]; then
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date."
+          else
+            echo "update_needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install minisign
+        if: steps.versions.outputs.update_needed == 'true'
+        run: sudo apt-get update && sudo apt-get install -y minisign
+
+      - name: Download, verify, and swap binaries
+        if: steps.versions.outputs.update_needed == 'true'
+        env:
+          VER: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/${UPSTREAM_REPO}/releases/download/${VER}"
+          DEST="files/usr/local/bin/dnscrypt-proxy-bin"
+          WORK="$(mktemp -d)"
+
+          for ARCH in amd64 arm64; do
+            TARBALL="dnscrypt-proxy-freebsd_${ARCH}-${VER}.tar.gz"
+            echo "=== ${ARCH}: downloading ${TARBALL} ==="
+            curl -fsSL -o "${WORK}/${TARBALL}"         "${BASE}/${TARBALL}"
+            curl -fsSL -o "${WORK}/${TARBALL}.minisig" "${BASE}/${TARBALL}.minisig"
+
+            echo "=== ${ARCH}: verifying signature ==="
+            minisign -Vm "${WORK}/${TARBALL}" -P "${MINISIGN_PUBKEY}"
+
+            echo "=== ${ARCH}: extracting binary ==="
+            tar -xzf "${WORK}/${TARBALL}" -C "${WORK}"
+            # Tarball name uses freebsd_<arch>; internal dir uses freebsd-<arch>.
+            install -m 0755 "${WORK}/freebsd-${ARCH}/dnscrypt-proxy" "${DEST}/dnscrypt-proxy-${ARCH}"
+          done
+
+          # Bump the package patch version (1.2.4 -> 1.2.5). Read only the
+          # PORTVERSION line so an unrelated version string elsewhere in the
+          # Makefile can't be picked up by mistake.
+          CURPKG=$(grep '^PORTVERSION=' Makefile | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "${CURPKG}" ]; then
+            echo "Could not read PORTVERSION from Makefile" >&2
+            exit 1
+          fi
+          NEWPKG=$(echo "${CURPKG}" | awk -F. '{$3++; print $1"."$2"."$3}' OFS=.)
+          echo "Package version: ${CURPKG} -> ${NEWPKG}"
+          sh bump-version.sh "${NEWPKG}"
+
+          # Record new upstream version.
+          echo "${VER}" > .upstream-version
+
+          echo "NEWPKG=${NEWPKG}" >> "$GITHUB_ENV"
+
+      - name: Open pull request
+        if: steps.versions.outputs.update_needed == 'true'
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c  # v6.1.0
+        with:
+          branch: upstream/dnscrypt-${{ steps.versions.outputs.latest }}
+          commit-message: "Update dnscrypt-proxy to ${{ steps.versions.outputs.latest }}, bump package to ${{ env.NEWPKG }}"
+          title: "Update dnscrypt-proxy to ${{ steps.versions.outputs.latest }}"
+          body: |
+            Automated update from upstream [DNSCrypt/dnscrypt-proxy ${{ steps.versions.outputs.latest }}](https://github.com/DNSCrypt/dnscrypt-proxy/releases/tag/${{ steps.versions.outputs.latest }}).
+
+            - Bundled binary: `${{ steps.versions.outputs.current }}` -> `${{ steps.versions.outputs.latest }}` (amd64 + arm64)
+            - Package version: bumped to `${{ env.NEWPKG }}`
+            - Minisign signatures verified against the official release key.
+
+            **To release:** review and merge this PR, then push a tag:
+            ```
+            git tag v${{ env.NEWPKG }} && git push origin v${{ env.NEWPKG }}
+            ```
+            That triggers the FreeBSD build/release workflow.
+          labels: upstream-update
+          delete-branch: true
