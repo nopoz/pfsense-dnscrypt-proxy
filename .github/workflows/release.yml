@@ -11,17 +11,27 @@ on:
         required: true
         default: '1.1.2'
 
-permissions:
-  contents: write
+# Default to no privileges; the job grants exactly what it needs below.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     name: Build Package on FreeBSD
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create the release and upload assets
+      id-token: write       # mint the OIDC token for build provenance
+      attestations: write   # record the SLSA attestation
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: Extract version from tag
         id: version
@@ -95,13 +105,36 @@ jobs:
           echo "=== Built packages ==="
           ls -la ./*.pkg ./*.txz 2>/dev/null || true
 
+      - name: Generate SHA256 checksums
+        run: |
+          set -euo pipefail
+          # Hash every downloadable package (versioned and the unversioned
+          # "latest" copy, whether .pkg or .txz) so users can verify what they
+          # pull from the release.
+          : > SHA256SUMS
+          for f in pfSense-pkg-dnscrypt-proxy*.pkg pfSense-pkg-dnscrypt-proxy*.txz; do
+            [ -e "$f" ] && sha256sum "$f" >> SHA256SUMS
+          done
+          echo "=== SHA256SUMS ==="
+          cat SHA256SUMS
+
+      # Cryptographic build provenance (SLSA): binds each package to this
+      # workflow, commit, and runner. Feeding the checksums file attests every
+      # listed artifact regardless of extension. Verifiable later with
+      # `gh attestation verify <file> --repo <owner>/<repo>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32  # v4.1.0
+        with:
+          subject-checksums: SHA256SUMS
+
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: pfSense-pkg-dnscrypt-proxy
           path: |
             *.pkg
             *.txz
+            SHA256SUMS
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -111,6 +144,7 @@ jobs:
           files: |
             *.pkg
             *.txz
+            SHA256SUMS
           body: |
             Bundles **dnscrypt-proxy ${{ steps.version.outputs.upstream }}** (upstream).
 
