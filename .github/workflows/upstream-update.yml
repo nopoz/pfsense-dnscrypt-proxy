@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
 
@@ -128,7 +128,7 @@ jobs:
 
       - name: Open pull request
         if: steps.versions.outputs.update_needed == 'true'
-        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c  # v6.1.0
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
         with:
           branch: upstream/dnscrypt-${{ steps.versions.outputs.latest }}
           commit-message: "Update dnscrypt-proxy to ${{ steps.versions.outputs.latest }}, bump package to ${{ env.NEWPKG }}"
