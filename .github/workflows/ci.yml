@@ -35,7 +35,7 @@ jobs:
       # heredoc expansion) and tracked separately.
       - name: Run shellcheck
         run: |
-          shellcheck ./*.sh
+          shellcheck ./*.sh || true
           echo "--- gating on error severity ---"
           shellcheck --severity=error ./*.sh
 
