@@ -13,3 +13,11 @@ updates:
           - "*"
     commit-message:
       prefix: ci
+
+  # Keep the pinned zizmor (CI static-analysis tool) current.
+  - package-ecosystem: pip
+    directory: /.github/zizmor
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
