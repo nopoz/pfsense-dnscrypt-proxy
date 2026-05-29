@@ -1,5 +1,10 @@
 # pfSense DNSCrypt Proxy Package
 
+[![CI](https://github.com/nopoz/pfsense-dnscrypt-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/nopoz/pfsense-dnscrypt-proxy/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/nopoz/pfsense-dnscrypt-proxy?sort=semver)](https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest)
+[![Build provenance](https://img.shields.io/badge/build%20provenance-attested-success)](SECURITY.md#verifying-a-download)
+[![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
+
 A pfSense package providing a full GUI for [DNSCrypt Proxy](https://github.com/DNSCrypt/dnscrypt-proxy), an encrypted DNS client supporting DNSCrypt v2, DNS-over-HTTPS (DoH), Oblivious DoH (ODoH), and Anonymized DNS protocols.
 
 > **Note:** This is a community-maintained package and is not affiliated with or supported by Netgate.
@@ -192,6 +197,22 @@ cd pfsense-dnscrypt-proxy
 - [pfSense FreeBSD-ports PR #1434](https://github.com/pfsense/FreeBSD-ports/pull/1434) - Submission to the official pfSense package repository
 - [pfSense Redmine #9315](https://redmine.pfsense.org/issues/9315) - Original feature request
 - [Netgate Forum Discussion](https://forum.netgate.com/topic/200181/dnscrypt-proxy-package-available-full-gui-support) - Community discussion and support
+
+## Security
+
+This package vendors a third-party binary, so the release pipeline is built to
+keep that supply chain auditable:
+
+- **Upstream binaries are signature-verified** (minisign, against the official
+  DNSCrypt key) in CI before they are committed, and proposed via pull request
+  rather than auto-merged.
+- **Releases carry SLSA build provenance** plus a `SHA256SUMS` file. Verify a
+  download with `gh attestation verify <pkg> --repo nopoz/pfsense-dnscrypt-proxy`.
+- **Workflows are hardened**: Actions pinned to commit SHAs (kept current by
+  Dependabot), least-privilege tokens, and CI static analysis with ShellCheck,
+  `php -l`, actionlint, and zizmor.
+
+See [SECURITY.md](SECURITY.md) for the full policy and how to report a vulnerability.
 
 ## License
 
