@@ -62,29 +62,37 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      ACTIONLINT_VERSION: 1.7.12
-      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
 
-      # Download a pinned actionlint release and verify its checksum before
-      # executing it, rather than piping an install script straight to a shell.
-      - name: Install actionlint (verified)
+      # actionlint only lints these workflows and never touches the shipped
+      # package, so it tracks the latest release rather than a pinned version
+      # (nothing to silently drift). Integrity is still enforced: the tarball
+      # is verified against the checksum published in that same release before
+      # it is executed.
+      - name: Install and run actionlint (latest, checksum-verified)
+        env:
+          # Authenticated API calls avoid the shared-runner anonymous rate limit.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${TARBALL}"
-          curl -fsSL -o "${TARBALL}" "${URL}"
-          echo "${ACTIONLINT_SHA256}  ${TARBALL}" | sha256sum -c -
+          TAG=$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" \
+            https://api.github.com/repos/rhysd/actionlint/releases/latest \
+            | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"v?([^"]+)".*/\1/')
+          if ! [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unexpected actionlint release tag: '${TAG}'" >&2
+            exit 1
+          fi
+          BASE="https://github.com/rhysd/actionlint/releases/download/v${TAG}"
+          TARBALL="actionlint_${TAG}_linux_amd64.tar.gz"
+          curl -fsSL -o "${TARBALL}" "${BASE}/${TARBALL}"
+          curl -fsSL -o checksums.txt "${BASE}/actionlint_${TAG}_checksums.txt"
+          grep " ${TARBALL}\$" checksums.txt | sha256sum -c -
           tar -xzf "${TARBALL}" actionlint
-          install -m 0755 actionlint /usr/local/bin/actionlint
-
-      - name: Run actionlint
-        run: actionlint -color
+          ./actionlint -color
 
   workflow-security:
     name: zizmor (Actions SAST)
@@ -106,7 +114,7 @@ jobs:
       # this repo already guards by hand (template injection, unpinned actions,
       # credential persistence, over-broad permissions).
       - name: Install zizmor
-        run: pip install zizmor==1.25.2
+        run: pip install -r .github/zizmor/requirements.txt
 
       - name: Audit workflows
         run: zizmor --offline --min-severity=low .github/workflows/
