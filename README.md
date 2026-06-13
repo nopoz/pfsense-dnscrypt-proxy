@@ -214,6 +214,18 @@ keep that supply chain auditable:
 
 See [SECURITY.md](SECURITY.md) for the full policy and how to report a vulnerability.
 
+## Support
+
+- Open a [GitHub issue](https://github.com/nopoz/pfsense-dnscrypt-proxy/issues) for bug reports, feature requests, or questions
+- Add a star on [GitHub](https://github.com/nopoz/pfsense-dnscrypt-proxy) to support the project!
+
+## More of my projects
+
+Other open-source tools I maintain that you might find useful:
+
+- [**Hosaka**](https://github.com/nopoz/hosaka) - Docker image update monitor with notifications and one-click updates.
+- [**Portrieve**](https://github.com/nopoz/portrieve) - back up, restore, and migrate Portainer stacks as plain Docker Compose files.
+
 ## License
 
 ISC License - See [LICENSE](LICENSE) for details.
