@@ -76,7 +76,7 @@ jobs:
           echo "Bundled dnscrypt-proxy: ${UPSTREAM}"
 
       - name: Build package on FreeBSD
-        uses: vmactions/freebsd-vm@a6de9343ef5747433d9c25784c90e84998b9d69a  # v1.4.6
+        uses: vmactions/freebsd-vm@b84ab5559b5a1bb4b8ee2737d2506a16e1737636  # v1.4.8
         env:
           PORTVERSION: ${{ steps.version.outputs.version }}
         with:
@@ -148,7 +148,7 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
         with:
           files: |
             *.pkg
