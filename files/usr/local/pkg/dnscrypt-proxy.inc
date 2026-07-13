@@ -30,7 +30,7 @@ define('DNSCRYPT_PROXY_RCFILE', '/usr/local/etc/rc.d/dnscrypt-proxy.sh');
 define('DNSCRYPT_PROXY_CONFIG', DNSCRYPT_PROXY_BASE . '/dnscrypt-proxy.toml');
 define('DNSCRYPT_PROXY_LOGDIR', '/var/log/dnscrypt-proxy');
 define('DNSCRYPT_PROXY_BUNDLED_DIR', '/usr/local/bin/dnscrypt-proxy-bin');
-define('DNSCRYPT_PROXY_VERSION', '2.1.16');
+define('DNSCRYPT_PROXY_VERSION', '2.1.17');
 
 /**
  * Get package configuration
