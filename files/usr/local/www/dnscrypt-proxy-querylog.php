@@ -157,9 +157,10 @@ display_top_tabs($tab_array);
 						<th><?=gettext("Client")?></th>
 						<th><?=gettext("Domain")?></th>
 						<th><?=gettext("Type")?></th>
-						<th><?=gettext("Server")?></th>
-						<th><?=gettext("Latency")?></th>
 						<th><?=gettext("Status")?></th>
+						<th><?=gettext("Latency")?></th>
+						<th><?=gettext("Server")?></th>
+						<th><?=gettext("Relay")?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -180,7 +181,7 @@ if (file_exists($query_log_file) && is_readable($query_log_file)) {
 			}
 
 			// Parse dnscrypt-proxy query log format (tab-separated)
-			// Format: timestamp	client_ip	query_name	query_type	resolver	latency_ms	status
+			// Format: timestamp	client_ip	query_name	query_type	return_code	duration	server	relay
 			$parts = explode("\t", $line);
 
 			if (count($parts) >= 6) {
@@ -189,9 +190,10 @@ if (file_exists($query_log_file) && is_readable($query_log_file)) {
 					'client' => $parts[1] ?? '',
 					'domain' => $parts[2] ?? '',
 					'type' => $parts[3] ?? '',
-					'server' => $parts[4] ?? '',
+					'status' => $parts[4] ?? '',
 					'latency' => $parts[5] ?? '',
-					'status' => $parts[6] ?? 'OK'
+					'server' => $parts[6] ?? '',
+					'relay' => $parts[7] ?? ''
 				);
 
 				// Apply filters
@@ -214,7 +216,7 @@ if (file_exists($query_log_file) && is_readable($query_log_file)) {
 
 if (empty($entries)): ?>
 					<tr>
-						<td colspan="7" class="text-center text-muted">
+						<td colspan="8" class="text-center text-muted">
 							<?php if (!file_exists($query_log_file)): ?>
 								<?=gettext("Query log file does not exist. Enable query logging and make some DNS queries.")?>
 							<?php else: ?>
@@ -224,17 +226,24 @@ if (empty($entries)): ?>
 					</tr>
 <?php else:
 	foreach ($entries as $entry):
-		$status_class = (stripos($entry['status'], 'PASS') !== false || $entry['status'] == 'OK') ? 'success' :
-		               ((stripos($entry['status'], 'BLOCK') !== false || stripos($entry['status'], 'REJECT') !== false) ? 'danger' : 'default');
+		// dnscrypt-proxy return codes, grouped by how they should read at a glance
+		$status_classes = array(
+			'PASS' => 'success', 'FORWARD' => 'success',
+			'REJECT' => 'danger', 'DROP' => 'danger', 'SYNTH' => 'danger', 'CLOAK' => 'danger',
+			'PARSE_ERROR' => 'warning', 'RESPONSE_ERROR' => 'warning',
+			'SERVER_ERROR' => 'warning', 'SERVER_TIMEOUT' => 'warning'
+		);
+		$status_class = $status_classes[strtoupper($entry['status'])] ?? 'default';
 ?>
 					<tr>
 						<td><?=htmlspecialchars($entry['time'])?></td>
 						<td><?=htmlspecialchars($entry['client'])?></td>
 						<td><code><?=htmlspecialchars($entry['domain'])?></code></td>
 						<td><span class="label label-primary"><?=htmlspecialchars($entry['type'])?></span></td>
-						<td><?=htmlspecialchars($entry['server'])?></td>
-						<td><?=htmlspecialchars($entry['latency'])?></td>
 						<td><span class="label label-<?=htmlspecialchars($status_class)?>"><?=htmlspecialchars($entry['status'])?></span></td>
+						<td><?=htmlspecialchars($entry['latency'])?></td>
+						<td><?=htmlspecialchars($entry['server'])?></td>
+						<td><?=htmlspecialchars($entry['relay'])?></td>
 					</tr>
 <?php
 	endforeach;
