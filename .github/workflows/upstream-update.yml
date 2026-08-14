@@ -99,6 +99,25 @@ jobs:
             install -m 0755 "${WORK}/freebsd-${ARCH}/dnscrypt-proxy" "${DEST}/dnscrypt-proxy-${ARCH}"
           done
 
+          # Regenerate distinfo from the very tarballs just verified above.
+          # This is how minisign provenance reaches the ports tree: the
+          # checksums recorded here are computed from signed artifacts.
+          {
+            echo "TIMESTAMP = $(date +%s)"
+            for ARCH in amd64 arm64; do
+              TARBALL="dnscrypt-proxy-freebsd_${ARCH}-${VER}.tar.gz"
+              echo "SHA256 (${TARBALL}) = $(sha256sum "${WORK}/${TARBALL}" | cut -d' ' -f1)"
+              echo "SIZE (${TARBALL}) = $(stat -c %s "${WORK}/${TARBALL}")"
+            done
+          } > distinfo
+
+          # Point the port at the new daemon version.
+          sed -i "s/^DNSCRYPT_VERSION=.*/DNSCRYPT_VERSION=\t${VER}/" Makefile
+          if ! grep -q "^DNSCRYPT_VERSION=	${VER}$" Makefile; then
+            echo "Failed to update DNSCRYPT_VERSION in Makefile" >&2
+            exit 1
+          fi
+
           # Bump the package patch version (1.2.4 -> 1.2.5). Read only the
           # PORTVERSION line so an unrelated version string elsewhere in the
           # Makefile can't be picked up by mistake.
@@ -139,6 +158,7 @@ jobs:
             - Bundled binary: `${{ steps.versions.outputs.current }}` -> `${{ steps.versions.outputs.latest }}` (amd64 + arm64)
             - Package version: bumped to `${{ env.NEWPKG }}`
             - Minisign signatures verified against the official release key.
+            - `distinfo` regenerated from the verified tarballs, and `DNSCRYPT_VERSION` bumped in `Makefile`.
 
             **To release:** review and merge this PR, then push a tag:
             ```
