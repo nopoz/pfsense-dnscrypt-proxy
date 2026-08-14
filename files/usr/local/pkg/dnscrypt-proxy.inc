@@ -779,6 +779,13 @@ function dnscrypt_proxy_install() {
  * Install the bundled dnscrypt-proxy binary for the current architecture
  */
 function dnscrypt_proxy_install_binary() {
+	// The ports build installs the daemon straight to DNSCRYPT_PROXY_BINARY
+	// from an upstream distfile, so there is no bundled directory to copy
+	// from. Absence is the normal case there, not a failure.
+	if (!is_dir(DNSCRYPT_PROXY_BUNDLED_DIR)) {
+		return true;
+	}
+
 	// Detect architecture
 	$arch = php_uname('m');
 	if ($arch == 'amd64' || $arch == 'x86_64') {
