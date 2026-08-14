@@ -4,7 +4,8 @@ name: Sync to FreeBSD-ports
 # fork, which is the head of upstream PR pfsense/FreeBSD-ports#1434.
 #
 # The ports fork is derived, never authored. Nothing there is edited by hand:
-# this workflow copies Makefile, pkg-descr, pkg-plist and files/ into
+# this workflow copies Makefile, pkg-descr, pkg-plist, distinfo and files/
+# (minus the bundled binaries) into
 # dns/pfSense-pkg-dnscrypt-proxy, amends the branch's single squashed commit,
 # and force-pushes, which updates the open PR in place.
 #
@@ -110,9 +111,14 @@ jobs:
 
           # --delete so that removing a file here removes it there. A plain
           # copy leaves deleted files behind in the PR forever.
-          rsync -a --delete pkg/files/ "${TARGET}/files/"
+          # The bundled binaries stay in this repo for the standalone .pkg
+          # build. The port fetches the daemon from upstream instead, so they
+          # must never reach the ports tree. --delete removes them from the
+          # target if an earlier sync put them there.
+          rsync -a --delete --exclude 'usr/local/bin/dnscrypt-proxy-bin/' \
+            pkg/files/ "${TARGET}/files/"
 
-          for f in Makefile pkg-descr pkg-plist; do
+          for f in Makefile pkg-descr pkg-plist distinfo; do
             install -m 0644 "pkg/${f}" "${TARGET}/${f}"
           done
 
