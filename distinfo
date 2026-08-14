@@ -1,0 +1,5 @@
+TIMESTAMP = 1786737215
+SHA256 (dnscrypt-proxy-freebsd_amd64-2.1.18.tar.gz) = 843ab6129bd7692b2f77ead2f3de1c7951d55258d3c542034c5d15be2b13f9ea
+SIZE (dnscrypt-proxy-freebsd_amd64-2.1.18.tar.gz) = 4694109
+SHA256 (dnscrypt-proxy-freebsd_arm64-2.1.18.tar.gz) = 7b198f662ac3602e914ff6c3764ef5d37dc674ef5bdd4b3231f8827cc759bcc8
+SIZE (dnscrypt-proxy-freebsd_arm64-2.1.18.tar.gz) = 4209599
