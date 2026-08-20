@@ -4,7 +4,7 @@ PORTNAME=	pfSense-pkg-dnscrypt-proxy
 PORTVERSION=	1.2.9
 CATEGORIES=	dns
 
-MAINTAINER=	ports@FreeBSD.org
+MAINTAINER=	bill.lowney@gmail.com
 COMMENT=	pfSense package for DNSCrypt Proxy encrypted DNS client
 
 LICENSE=	ISCL
