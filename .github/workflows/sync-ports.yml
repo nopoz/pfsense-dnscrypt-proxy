@@ -130,6 +130,7 @@ jobs:
           find "${TARGET}" -type f | sort
 
       - name: Amend branch commit and push
+        id: push
         env:
           VERSION: ${{ steps.version.outputs.version }}
           PORTS_SYNC_TOKEN: ${{ secrets.PORTS_SYNC_TOKEN }}
@@ -170,6 +171,7 @@ jobs:
         if: always()
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
         run: |
           {
             echo "### Ports sync"
@@ -178,6 +180,8 @@ jobs:
               echo "Pushed \`v${VERSION}\` to \`${PORTS_REPO}\` branch \`${PORTS_BRANCH}\`."
               echo
               echo "PR: https://github.com/pfsense/FreeBSD-ports/pull/1434"
+            elif [ "${PUSH_OUTCOME}" = "failure" ]; then
+              echo "Sync failed: the push step did not complete. See job logs."
             else
               echo "No changes to push for \`v${VERSION}\`."
             fi

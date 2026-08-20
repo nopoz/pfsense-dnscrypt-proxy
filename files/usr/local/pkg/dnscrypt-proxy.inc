@@ -869,7 +869,12 @@ function dnscrypt_proxy_deinstall() {
 	}
 
 	// Remove files
-	unlink_if_exists(DNSCRYPT_PROXY_BINARY);
+	// The binary is only ours to remove for the standalone package, which
+	// installed it itself. In the ports distribution, pkg owns the binary
+	// via pkg-plist and removes it on its own.
+	if (is_dir(DNSCRYPT_PROXY_BUNDLED_DIR)) {
+		unlink_if_exists(DNSCRYPT_PROXY_BINARY);
+	}
 	unlink_if_exists(DNSCRYPT_PROXY_RCFILE);
 	unlink_if_exists(DNSCRYPT_PROXY_CONFIG);
 	unlink_if_exists(DNSCRYPT_PROXY_BASE . '/blocked-names.txt');

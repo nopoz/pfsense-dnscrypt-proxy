@@ -5,8 +5,9 @@ name: Ports check
 # run it: the dev machine is Linux, and the pfSense box has no ports tree.
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -48,6 +49,18 @@ jobs:
             for f in Makefile pkg-descr pkg-plist distinfo; do
               [ -f "${WS}/${f}" ] && cp "${WS}/${f}" "${PORTDIR}/"
             done
+
+            # sync-ports.yml excludes the bundled binaries from what actually
+            # reaches the ports tree. Mirror that here so this gate builds
+            # what sync ships, not a superset of it.
+            BUNDLED_DIR="${PORTDIR}/files/usr/local/bin/dnscrypt-proxy-bin"
+            rm -rf "${BUNDLED_DIR}"
+
+            # Assert the invariant: no bundled binaries reach the ports tree.
+            if find "${BUNDLED_DIR}" -mindepth 1 2>/dev/null | grep -q .; then
+              echo "::error::Bundled binaries still present under ${BUNDLED_DIR}" >&2
+              exit 1
+            fi
 
             cd "${PORTDIR}"
             make check-plist
