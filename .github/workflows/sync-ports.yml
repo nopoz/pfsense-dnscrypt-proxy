@@ -162,6 +162,12 @@ jobs:
           # Feed the token through a credential helper rather than embedding it
           # in the remote URL or a command argument, so it never lands in
           # .git/config, the process table, or the run log.
+          #
+          # The single quotes are the whole point: ${PORTS_SYNC_TOKEN} must be
+          # stored literally and expanded by sh when git invokes the helper at
+          # push time. Expanding it here would write the token into
+          # .git/config, which is exactly what this avoids.
+          # shellcheck disable=SC2016
           git config credential.helper '!f() { echo username=x-access-token; echo "password=${PORTS_SYNC_TOKEN}"; }; f'
 
           git push --force-with-lease origin "HEAD:${PORTS_BRANCH}"
