@@ -779,6 +779,13 @@ function dnscrypt_proxy_install() {
  * Install the bundled dnscrypt-proxy binary for the current architecture
  */
 function dnscrypt_proxy_install_binary() {
+	// The ports build installs the daemon straight to DNSCRYPT_PROXY_BINARY
+	// from an upstream distfile, so there is no bundled directory to copy
+	// from. Absence is the normal case there, not a failure.
+	if (!is_dir(DNSCRYPT_PROXY_BUNDLED_DIR)) {
+		return true;
+	}
+
 	// Detect architecture
 	$arch = php_uname('m');
 	if ($arch == 'amd64' || $arch == 'x86_64') {
@@ -862,7 +869,12 @@ function dnscrypt_proxy_deinstall() {
 	}
 
 	// Remove files
-	unlink_if_exists(DNSCRYPT_PROXY_BINARY);
+	// The binary is only ours to remove for the standalone package, which
+	// installed it itself. In the ports distribution, pkg owns the binary
+	// via pkg-plist and removes it on its own.
+	if (is_dir(DNSCRYPT_PROXY_BUNDLED_DIR)) {
+		unlink_if_exists(DNSCRYPT_PROXY_BINARY);
+	}
 	unlink_if_exists(DNSCRYPT_PROXY_RCFILE);
 	unlink_if_exists(DNSCRYPT_PROXY_CONFIG);
 	unlink_if_exists(DNSCRYPT_PROXY_BASE . '/blocked-names.txt');

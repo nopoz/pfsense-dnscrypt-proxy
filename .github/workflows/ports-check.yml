@@ -1,0 +1,66 @@
+name: Ports check
+
+# Builds the port the way the FreeBSD ports framework will, and checks the
+# plist against what actually gets staged. This is the only place that can
+# run it: the dev machine is Linux, and the pfSense box has no ports tree.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    name: make check-plist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stage port into a ports tree and check it
+        uses: vmactions/freebsd-vm@83b151f58c6047089f4c80eb5ba2039d158ce093  # v1.5.3
+        with:
+          usesh: true
+          release: "15.0"
+          run: |
+            set -e
+            WS=$(pwd)
+            pkg install -y git
+
+            # The pfSense ports tree is 169k files and 2.7 GB of history.
+            # Take only the framework directories plus our package dir.
+            git clone --depth 1 --filter=blob:none --no-checkout --single-branch \
+              --branch devel https://github.com/pfsense/FreeBSD-ports.git /usr/ports
+            cd /usr/ports
+            git sparse-checkout init --cone
+            git sparse-checkout set Mk Templates Keywords dns/pfSense-pkg-dnscrypt-proxy
+            git checkout devel
+
+            # Overlay this repo's port definition.
+            PORTDIR=/usr/ports/dns/pfSense-pkg-dnscrypt-proxy
+            rm -rf "${PORTDIR}"
+            mkdir -p "${PORTDIR}"
+            cp -R "${WS}/files" "${PORTDIR}/files"
+            for f in Makefile pkg-descr pkg-plist distinfo; do
+              [ -f "${WS}/${f}" ] && cp "${WS}/${f}" "${PORTDIR}/"
+            done
+
+            # sync-ports.yml excludes the bundled binaries from what actually
+            # reaches the ports tree. Mirror that here so this gate builds
+            # what sync ships, not a superset of it.
+            BUNDLED_DIR="${PORTDIR}/files/usr/local/bin/dnscrypt-proxy-bin"
+            rm -rf "${BUNDLED_DIR}"
+
+            # Assert the invariant: no bundled binaries reach the ports tree.
+            if find "${BUNDLED_DIR}" -mindepth 1 2>/dev/null | grep -q .; then
+              echo "::error::Bundled binaries still present under ${BUNDLED_DIR}" >&2
+              exit 1
+            fi
+
+            cd "${PORTDIR}"
+            make check-plist

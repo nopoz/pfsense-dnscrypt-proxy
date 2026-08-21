@@ -1,0 +1,194 @@
+name: Sync to FreeBSD-ports
+
+# Projects this repo onto the ports-tree layout carried by the FreeBSD-ports
+# fork, which is the head of upstream PR pfsense/FreeBSD-ports#1434.
+#
+# The ports fork is derived, never authored. Nothing there is edited by hand:
+# this workflow copies Makefile, pkg-descr, pkg-plist, distinfo and files/
+# (minus the bundled binaries) into
+# dns/pfSense-pkg-dnscrypt-proxy, amends the branch's single squashed commit,
+# and force-pushes, which updates the open PR in place.
+#
+# Replaces the local sync-to-ports.sh, which was gitignored, machine-specific,
+# and had to be remembered. It was not, and the fork drifted five versions.
+#
+# Triggering on the release tag rather than on push to main is deliberate: the
+# PR should show a released version, not work in progress. This runs alongside
+# release.yml rather than after it, because the ports tree builds the package
+# itself in poudriere, so a failed .pkg build does not invalidate the sources.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to sync (e.g. 1.2.9)'
+        required: true
+
+# Default to no privileges. This job needs none against *this* repo; writing to
+# the ports fork is authorised by PORTS_SYNC_TOKEN, not by GITHUB_TOKEN.
+permissions: {}
+
+# Never let two runs force-push the same branch at once.
+concurrency:
+  group: sync-ports
+  cancel-in-progress: false
+
+env:
+  PORTS_REPO: nopoz/FreeBSD-ports
+  PORTS_BRANCH: dnscrypt
+  PKG_SUBDIR: dns/pfSense-pkg-dnscrypt-proxy
+
+jobs:
+  sync:
+    name: Project onto ports tree
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          path: pkg
+          persist-credentials: false
+
+      - name: Resolve and validate version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+
+          # Anchor to a plain dotted release before the value reaches a commit
+          # message or a shell. Same guard as release.yml, for the same reason.
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version '${VERSION}'. Expected MAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+
+          # Refuse to sync a tag that does not match the Makefile at that
+          # commit. Without this the ports PR can advertise a version whose
+          # sources are something else entirely.
+          MK=$(grep '^PORTVERSION=' pkg/Makefile | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ "${VERSION}" != "${MK}" ]; then
+            echo "::error::Version ${VERSION} does not match Makefile PORTVERSION ${MK} at this commit." >&2
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Syncing version ${VERSION}"
+
+      # The ports tree is ~169k files and 2.7 GB of history. Clone only what
+      # this job touches: blobless, single branch, sparse to the one package
+      # directory. fetch-depth 2 rather than 1 so the parent of the branch tip
+      # is a real local object, which keeps `commit --amend` and the subsequent
+      # push out of shallow-clone edge cases.
+      - name: Checkout ports fork (sparse)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ env.PORTS_REPO }}
+          ref: ${{ env.PORTS_BRANCH }}
+          token: ${{ secrets.PORTS_SYNC_TOKEN }}
+          path: ports
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: ${{ env.PKG_SUBDIR }}
+          persist-credentials: false
+
+      - name: Sync package files
+        run: |
+          set -euo pipefail
+          TARGET="ports/${PKG_SUBDIR}"
+          mkdir -p "${TARGET}"
+
+          # --delete so that removing a file here removes it there. A plain
+          # copy leaves deleted files behind in the PR forever.
+          # The bundled binaries stay in this repo for the standalone .pkg
+          # build. The port fetches the daemon from upstream instead, so they
+          # must never reach the ports tree. --delete removes them from the
+          # target if an earlier sync put them there.
+          rsync -a --delete --exclude 'usr/local/bin/dnscrypt-proxy-bin/' \
+            pkg/files/ "${TARGET}/files/"
+
+          for f in Makefile pkg-descr pkg-plist distinfo; do
+            install -m 0644 "pkg/${f}" "${TARGET}/${f}"
+          done
+
+          # build/ holds generated artifacts and must never reach the ports
+          # tree, whether or not it was ever committed there.
+          rm -rf "${TARGET:?}/build"
+
+          echo "=== synced tree ==="
+          find "${TARGET}" -type f | sort
+
+      - name: Amend branch commit and push
+        id: push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PORTS_SYNC_TOKEN: ${{ secrets.PORTS_SYNC_TOKEN }}
+        working-directory: ports
+        run: |
+          set -euo pipefail
+
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add -A -- "${PKG_SUBDIR}"
+
+          if git diff --cached --quiet; then
+            echo "Ports fork already matches v${VERSION}. Nothing to push."
+            echo "PUSHED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "=== changes to be pushed ==="
+          git diff --cached --stat
+
+          # The PR is deliberately a single squashed commit. Amend it rather
+          # than adding to it, so the upstream diff stays reviewable as one
+          # "add new package" change.
+          git commit --amend -m "${PKG_SUBDIR}: add new package v${VERSION}
+
+          Synced from the standalone repository at v${VERSION}."
+
+          # Feed the token through a credential helper rather than embedding it
+          # in the remote URL or a command argument, so it never lands in
+          # .git/config, the process table, or the run log.
+          #
+          # The single quotes are the whole point: ${PORTS_SYNC_TOKEN} must be
+          # stored literally and expanded by sh when git invokes the helper at
+          # push time. Expanding it here would write the token into
+          # .git/config, which is exactly what this avoids.
+          # shellcheck disable=SC2016
+          git config credential.helper '!f() { echo username=x-access-token; echo "password=${PORTS_SYNC_TOKEN}"; }; f'
+
+          git push --force-with-lease origin "HEAD:${PORTS_BRANCH}"
+          echo "PUSHED=true" >> "$GITHUB_ENV"
+
+      - name: Summary
+        if: always()
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+        run: |
+          {
+            echo "### Ports sync"
+            echo
+            if [ "${PUSHED:-false}" = "true" ]; then
+              echo "Pushed \`v${VERSION}\` to \`${PORTS_REPO}\` branch \`${PORTS_BRANCH}\`."
+              echo
+              echo "PR: https://github.com/pfsense/FreeBSD-ports/pull/1434"
+            elif [ "${PUSH_OUTCOME}" = "failure" ]; then
+              echo "Sync failed: the push step did not complete. See job logs."
+            else
+              echo "No changes to push for \`v${VERSION}\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
