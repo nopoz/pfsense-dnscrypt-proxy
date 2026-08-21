@@ -111,12 +111,26 @@ jobs:
 
           # --delete so that removing a file here removes it there. A plain
           # copy leaves deleted files behind in the PR forever.
+          #
           # The bundled binaries stay in this repo for the standalone .pkg
           # build. The port fetches the daemon from upstream instead, so they
-          # must never reach the ports tree. --delete removes them from the
-          # target if an earlier sync put them there.
-          rsync -a --delete --exclude 'usr/local/bin/dnscrypt-proxy-bin/' \
+          # must never reach the ports tree.
+          #
+          # --delete-excluded is load-bearing, not decoration. On its own,
+          # --exclude PROTECTS matching files already in the destination from
+          # --delete, so an --exclude/--delete pair leaves previously synced
+          # binaries sitting in the fork forever. Only --delete-excluded
+          # removes them. This is invisible when syncing into an empty
+          # directory, which is why it survived a local dry run.
+          rsync -a --delete --delete-excluded \
+            --exclude 'usr/local/bin/dnscrypt-proxy-bin/' \
             pkg/files/ "${TARGET}/files/"
+
+          # Assert it, rather than trusting the flag combination.
+          if find "${TARGET}/files" -name 'dnscrypt-proxy-*64' -print -quit | grep -q .; then
+            echo "::error::Bundled binaries reached the ports projection" >&2
+            exit 1
+          fi
 
           for f in Makefile pkg-descr pkg-plist distinfo; do
             install -m 0644 "pkg/${f}" "${TARGET}/${f}"
