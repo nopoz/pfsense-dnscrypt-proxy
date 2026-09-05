@@ -50,8 +50,13 @@ echo ""
 echo "=== Step 2: Remove pkg registration (if installed via pkg) ==="
 if pkg info "${PORTNAME}" >/dev/null 2>&1; then
     echo "Removing package registration..."
-    pkg delete -y "${PORTNAME}" 2>/dev/null || true
-    echo "Removed."
+    # -f because the package declares itself vital; deinstall scripts still run.
+    if pkg delete -y -f "${PORTNAME}"; then
+        echo "Removed."
+    else
+        echo "WARNING: pkg delete failed. The package is still registered."
+        echo "         Files removed below will leave pkg's database stale."
+    fi
 else
     echo "Not registered as a pkg."
 fi
