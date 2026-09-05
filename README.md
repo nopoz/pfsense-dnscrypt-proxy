@@ -121,8 +121,9 @@ itself automatic (see `-A` above) precisely so that loop skips it rather than
 stopping on it.
 
 The package is left installed with its settings gone from `config.xml`, so it
-disappears from **Services** while its daemon keeps running from the previous
-configuration. Remove it explicitly if you want a clean box:
+disappears from **Services**. The daemon will not start in that state, so
+nothing is left running, but the package files remain. Remove it explicitly if
+you want a clean box:
 
 ```bash
 pkg delete -f pfSense-pkg-dnscrypt-proxy
