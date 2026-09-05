@@ -113,6 +113,21 @@ pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/lates
 
 Your configuration settings are preserved during upgrades.
 
+### Factory Defaults reset
+
+A Factory Defaults reset will **not** remove this package. pfSense removes
+add-on packages by looping over manually installed ones, and this package marks
+itself automatic (see `-A` above) precisely so that loop skips it rather than
+stopping on it.
+
+The package is left installed with its settings gone from `config.xml`, so it
+disappears from **Services** while its daemon keeps running from the previous
+configuration. Remove it explicitly if you want a clean box:
+
+```bash
+pkg delete -f pfSense-pkg-dnscrypt-proxy
+```
+
 ### Upgrading pfSense itself
 
 Upgrading pfSense (2.8.1 to 2.9.0, for example) deletes every package that is
