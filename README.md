@@ -62,13 +62,13 @@ Run this command in the pfSense shell (via SSH or Console):
 ### pfSense CE
 
 ```bash
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 ### pfSense Plus
 
 ```bash
-pkg-static -C /dev/null add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static -C /dev/null add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 ### Installing a Specific Version
@@ -76,7 +76,7 @@ pkg-static -C /dev/null add https://github.com/nopoz/pfsense-dnscrypt-proxy/rele
 Replace `latest/download/pfSense-pkg-dnscrypt-proxy.pkg` with `download/vX.X.X/pfSense-pkg-dnscrypt-proxy-X.X.X.pkg`:
 
 ```bash
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/download/v1.0.0/pfSense-pkg-dnscrypt-proxy-1.0.0.pkg
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/download/v1.0.0/pfSense-pkg-dnscrypt-proxy-1.0.0.pkg
 ```
 
 See all available versions on the [Releases](https://github.com/nopoz/pfsense-dnscrypt-proxy/releases) page.
@@ -85,22 +85,72 @@ After installation, navigate to **Services > DNSCrypt Proxy** in the pfSense web
 
 > **Note:** This package won't appear under "Installed Packages" since it's installed manually, not from the pfSense repository. It will appear under **Services > DNSCrypt Proxy**, on the Dashboard under **Services Status**, and under **Status > Services**.
 
+> **Why `-A`?** It marks the package automatically installed, which is not
+> cosmetic here. pfSense's bulk package operations, Factory Defaults reset and
+> "Reinstall all packages", loop over manually installed packages only and stop
+> at the first one they cannot find in the pfSense repository. A package
+> installed from a file is never in that repository, so without `-A` those
+> operations abort partway and silently leave every package sorting after this
+> one untouched. With `-A` they skip this package and finish normally. It does
+> not risk the package being auto-removed, because the package also marks
+> itself vital. If you installed without `-A`, run
+> `pkg set -A 1 pfSense-pkg-dnscrypt-proxy` once.
+
 ### Upgrading
 
 To upgrade to a newer version, use the `-f` (force) flag:
 
 ```bash
-pkg-static add -f https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static add -f -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 Or delete the existing package first, then install the new version:
 
 ```bash
-pkg delete pfSense-pkg-dnscrypt-proxy
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg delete -f pfSense-pkg-dnscrypt-proxy
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 Your configuration settings are preserved during upgrades.
+
+### Factory Defaults reset
+
+A Factory Defaults reset will **not** remove this package. pfSense removes
+add-on packages by looping over manually installed ones, and this package marks
+itself automatic (see `-A` above) precisely so that loop skips it rather than
+stopping on it.
+
+The package is left installed with its settings gone from `config.xml`, so it
+disappears from **Services**. The daemon will not start in that state, so
+nothing is left running, but the package files remain. Remove it explicitly if
+you want a clean box:
+
+```bash
+pkg delete -f pfSense-pkg-dnscrypt-proxy
+```
+
+### Upgrading pfSense itself
+
+Upgrading pfSense (2.8.1 to 2.9.0, for example) deletes every package that is
+not in the official pfSense repository. This is deliberate behaviour in
+Netgate's upgrade script and has been since 2017: any `pfSense-pkg-*` it cannot
+find in the remote repo is flagged automatic and collected by `pkg autoremove`.
+
+From 1.2.10 the package marks itself vital, which makes `pkg autoremove` skip
+it, so it now survives. **Reinstall the current release afterwards anyway.** A
+major pfSense upgrade can change the FreeBSD base and the PHP version
+underneath the package (2.9.0 moves to FreeBSD 16 and PHP 8.5), and the flag
+only guarantees the files are still there, not that they still run.
+
+If you are coming from a version before 1.2.10, or you restore a config backup
+onto a fresh install, the package will be gone and the symptom is that
+**the firewall loses all DNS.** The `forward-addr: 127.0.0.1@5300` line in the
+DNS Resolver custom options belongs to Unbound, so it survives the upgrade and
+now points at a port with nothing listening. Unbound forwards every query into
+the void, including the firewall's own attempts to reach the package
+repository. To recover: remove the `forward-zone` block from Services > DNS
+Resolver > Custom options, apply, reinstall the package, then put the block
+back.
 
 ## Configuration Guide
 
@@ -129,6 +179,10 @@ forward-zone:
 
 3. Click **Save** and **Apply Changes**
 
+These lines belong to Unbound, not to this package, so they stay behind if the
+package is ever removed and will take the firewall's DNS down with them. See
+[Upgrading pfSense itself](#upgrading-pfsense-itself).
+
 ### Option B: Use as System DNS Directly
 
 To use DNSCrypt Proxy directly via **System > General Setup**:
@@ -142,8 +196,17 @@ Note: The pfSense DNS Server Settings only accepts IP addresses and assumes port
 ## Uninstall
 
 ```bash
-pkg delete pfSense-pkg-dnscrypt-proxy
+pkg delete -f pfSense-pkg-dnscrypt-proxy
 ```
+
+The `-f` is required because the package marks itself vital so that a pfSense
+OS upgrade cannot delete it (see [Upgrading pfSense
+itself](#upgrading-pfsense-itself)). It only bypasses that check, so the
+uninstall is otherwise normal and still runs the package's own cleanup.
+
+Use `-f` rather than clearing the vital flag by hand. `pkg set -v 0` leaves the
+package marked automatic but no longer protected, and the next `pkg autoremove`
+will then delete it without warning.
 
 ### Complete Removal (Troubleshooting)
 
