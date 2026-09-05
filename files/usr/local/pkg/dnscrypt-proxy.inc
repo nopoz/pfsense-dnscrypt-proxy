@@ -841,11 +841,23 @@ function dnscrypt_proxy_install_binary() {
 function dnscrypt_proxy_write_rcfile() {
 	$rc = array();
 	$rc['file'] = 'dnscrypt-proxy.sh';
+	// The config.xml check covers a Factory Defaults reset. The reset wipes
+	// config.xml but leaves this package installed, and pfSense's
+	// rc.start_packages globs every rc file and starts the ones no registered
+	// package claimed, so without this the daemon comes back at boot with no
+	// GUI able to see or manage it. Deliberately fails open: it only declines
+	// when config.xml is readable and definitely lacks our settings, because a
+	// guard that misfires would leave the firewall with no DNS.
 	$rc['start'] = <<<'EOF'
+CONF=/conf/config.xml
 if [ -f /usr/local/etc/dnscrypt-proxy/dnscrypt-proxy.toml ] && [ -x /usr/local/bin/dnscrypt-proxy ]; then
-	/usr/bin/killall -q dnscrypt-proxy
-	/usr/sbin/daemon -p /var/run/dnscrypt_proxy.pid -f /usr/local/bin/dnscrypt-proxy -config /usr/local/etc/dnscrypt-proxy/dnscrypt-proxy.toml
-	/usr/bin/logger -p daemon.info -t dnscrypt-proxy "Service started"
+	if [ -r "$CONF" ] && ! /usr/bin/grep -q '<dnscryptproxy>' "$CONF"; then
+		/usr/bin/logger -p daemon.notice -t dnscrypt-proxy "Not starting: no configuration in config.xml (package left installed after a factory reset?)"
+	else
+		/usr/bin/killall -q dnscrypt-proxy
+		/usr/sbin/daemon -p /var/run/dnscrypt_proxy.pid -f /usr/local/bin/dnscrypt-proxy -config /usr/local/etc/dnscrypt-proxy/dnscrypt-proxy.toml
+		/usr/bin/logger -p daemon.info -t dnscrypt-proxy "Service started"
+	fi
 fi
 EOF;
 	$rc['stop'] = <<<'EOF'
