@@ -34,6 +34,19 @@ set -e
 
 PORTNAME="pfSense-pkg-dnscrypt-proxy"
 
+# Random label, so a warm Unbound cache cannot report success for a resolver
+# that is already broken.
+dns_probe() {
+    _p="$(od -An -N4 -tx1 /dev/urandom | tr -dc '0-9a-f').example.com"
+    timeout 6 drill "${_p}" @127.0.0.1 2>/dev/null \
+        | sed -n 's/.*rcode: \([A-Z]*\).*/\1/p' | head -1
+}
+
+# Baseline before anything is touched. Without it the final check cannot tell
+# "this uninstall broke DNS" from "nothing was ever listening on 127.0.0.1:53",
+# which is the normal state when neither Resolver nor Forwarder is enabled.
+DNS_BEFORE=$(dns_probe || true)
+
 echo "=== Step 1: Stop dnscrypt-proxy if running ==="
 if pgrep -q dnscrypt-proxy 2>/dev/null; then
     echo "Stopping dnscrypt-proxy..."
@@ -236,23 +249,25 @@ echo "Your saved options will be restored on next install."
 
 echo ""
 echo "=== Step 9: Verify DNS still resolves ==="
-# Random label, so a warm Unbound cache cannot mask an already-broken resolver.
-PROBE="$(od -An -N4 -tx1 /dev/urandom | tr -dc '0-9a-f').example.com"
-RCODE=$(timeout 6 drill "${PROBE}" @127.0.0.1 2>/dev/null \
-    | sed -n 's/.*rcode: \([A-Z]*\).*/\1/p' | head -1 || true)
-case "${RCODE}" in
-    NOERROR|NXDOMAIN)
-        echo "Resolver answered ${RCODE} for an uncached name. DNS still works."
+DNS_AFTER=$(dns_probe || true)
+case "${DNS_BEFORE}:${DNS_AFTER}" in
+    *:NOERROR|*:NXDOMAIN)
+        echo "Resolver answered ${DNS_AFTER} for an uncached name. DNS still works."
         ;;
-    *)
-        echo "WARNING: this firewall can no longer resolve DNS."
-        echo "         Got '${RCODE:-no response}' for an uncached name via 127.0.0.1."
+    NOERROR:*|NXDOMAIN:*)
+        echo "WARNING: this firewall resolved DNS before this uninstall and does not now."
+        echo "         127.0.0.1 went from '${DNS_BEFORE}' to '${DNS_AFTER:-no response}'."
         echo ""
         echo "         Something is still pointed at the DNSCrypt Proxy listener,"
         echo "         which no longer exists. Check both:"
         echo "           Services > DNS Resolver > Custom options   (forward-zone to 127.0.0.1@5300)"
         echo "           System > General Setup > DNS Servers       (a loopback address)"
         echo "         Remove it, then Save and Apply Changes."
+        ;;
+    *)
+        echo "Note: 127.0.0.1 did not resolve before this uninstall either"
+        echo "      ('${DNS_BEFORE:-no response}' -> '${DNS_AFTER:-no response}'), so this"
+        echo "      uninstall is not the cause. Nothing to do here."
         ;;
 esac
 REMOTE

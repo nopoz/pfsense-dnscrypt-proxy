@@ -171,7 +171,7 @@ jobs:
 
             ### Uninstall
             ```bash
-            pkg delete pfSense-pkg-dnscrypt-proxy
+            pkg delete -f pfSense-pkg-dnscrypt-proxy
             ```
 
             See [README](https://github.com/${{ github.repository }}#readme) for full documentation.
