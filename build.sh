@@ -278,7 +278,7 @@ if pkg info ${PORTNAME} >/dev/null 2>&1; then
     pkg delete -y -f ${PORTNAME}
 fi
 
-pkg add -f ${PKG_FILE}
+pkg add -f -A ${PKG_FILE}
 
 echo "Running post-install..."
 /usr/local/bin/php -f /etc/rc.packages ${PORTNAME} POST-INSTALL || true

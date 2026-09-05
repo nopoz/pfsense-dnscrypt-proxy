@@ -62,13 +62,13 @@ Run this command in the pfSense shell (via SSH or Console):
 ### pfSense CE
 
 ```bash
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 ### pfSense Plus
 
 ```bash
-pkg-static -C /dev/null add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static -C /dev/null add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 ### Installing a Specific Version
@@ -76,7 +76,7 @@ pkg-static -C /dev/null add https://github.com/nopoz/pfsense-dnscrypt-proxy/rele
 Replace `latest/download/pfSense-pkg-dnscrypt-proxy.pkg` with `download/vX.X.X/pfSense-pkg-dnscrypt-proxy-X.X.X.pkg`:
 
 ```bash
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/download/v1.0.0/pfSense-pkg-dnscrypt-proxy-1.0.0.pkg
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/download/v1.0.0/pfSense-pkg-dnscrypt-proxy-1.0.0.pkg
 ```
 
 See all available versions on the [Releases](https://github.com/nopoz/pfsense-dnscrypt-proxy/releases) page.
@@ -85,19 +85,30 @@ After installation, navigate to **Services > DNSCrypt Proxy** in the pfSense web
 
 > **Note:** This package won't appear under "Installed Packages" since it's installed manually, not from the pfSense repository. It will appear under **Services > DNSCrypt Proxy**, on the Dashboard under **Services Status**, and under **Status > Services**.
 
+> **Why `-A`?** It marks the package automatically installed, which is not
+> cosmetic here. pfSense's bulk package operations, Factory Defaults reset and
+> "Reinstall all packages", loop over manually installed packages only and stop
+> at the first one they cannot find in the pfSense repository. A package
+> installed from a file is never in that repository, so without `-A` those
+> operations abort partway and silently leave every package sorting after this
+> one untouched. With `-A` they skip this package and finish normally. It does
+> not risk the package being auto-removed, because the package also marks
+> itself vital. If you installed without `-A`, run
+> `pkg set -A 1 pfSense-pkg-dnscrypt-proxy` once.
+
 ### Upgrading
 
 To upgrade to a newer version, use the `-f` (force) flag:
 
 ```bash
-pkg-static add -f https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static add -f -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 Or delete the existing package first, then install the new version:
 
 ```bash
 pkg delete -f pfSense-pkg-dnscrypt-proxy
-pkg-static add https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
+pkg-static add -A https://github.com/nopoz/pfsense-dnscrypt-proxy/releases/latest/download/pfSense-pkg-dnscrypt-proxy.pkg
 ```
 
 Your configuration settings are preserved during upgrades.
@@ -175,9 +186,11 @@ pkg delete -f pfSense-pkg-dnscrypt-proxy
 The `-f` is required because the package marks itself vital so that a pfSense
 OS upgrade cannot delete it (see [Upgrading pfSense
 itself](#upgrading-pfsense-itself)). It only bypasses that check, so the
-uninstall is otherwise normal and still runs the package's own cleanup. If you
-prefer, `pkg set -v 0 pfSense-pkg-dnscrypt-proxy` first and then plain `pkg
-delete` does the same thing.
+uninstall is otherwise normal and still runs the package's own cleanup.
+
+Use `-f` rather than clearing the vital flag by hand. `pkg set -v 0` leaves the
+package marked automatic but no longer protected, and the next `pkg autoremove`
+will then delete it without warning.
 
 ### Complete Removal (Troubleshooting)
 
