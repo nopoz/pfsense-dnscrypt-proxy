@@ -128,6 +128,10 @@ generate_manifest() {
     # Note: We use a wildcard ABI to support both pfSense CE (FreeBSD 15) and
     # pfSense Plus (FreeBSD 16). This works because dnscrypt-proxy is a
     # statically-linked Go binary with no libc dependencies.
+    #
+    # vital: true survives a pfSense OS upgrade, which autoremoves any
+    # pfSense-pkg-* missing from the Netgate repo. The port must not set it:
+    # a repo package is never flagged, and vital blocks the GUI Remove button.
     cat > "${BUILD_DIR}/+MANIFEST" <<EOF
 name: "${PORTNAME}"
 version: "${PORTVERSION}"
@@ -136,6 +140,7 @@ comment: "pfSense package for DNSCrypt Proxy encrypted DNS client"
 maintainer: "ports@FreeBSD.org"
 prefix: "${PREFIX}"
 abi: "FreeBSD:*:*"
+vital: true
 desc: "pfSense package for DNSCrypt Proxy, an encrypted DNS client supporting DNSCrypt v2 and DNS-over-HTTPS protocols."
 www: "https://github.com/DNSCrypt/dnscrypt-proxy"
 licenselogic: "single"
@@ -269,10 +274,11 @@ set -e
 
 if pkg info ${PORTNAME} >/dev/null 2>&1; then
     echo "Removing existing ${PORTNAME}..."
-    pkg delete -y ${PORTNAME}
+    # -f because the package declares itself vital.
+    pkg delete -y -f ${PORTNAME}
 fi
 
-pkg add -f ${PKG_FILE}
+pkg add -f -A ${PKG_FILE}
 
 echo "Running post-install..."
 /usr/local/bin/php -f /etc/rc.packages ${PORTNAME} POST-INSTALL || true

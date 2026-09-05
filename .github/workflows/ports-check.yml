@@ -64,3 +64,11 @@ jobs:
 
             cd "${PORTDIR}"
             make check-plist
+
+            # check-plist fetches and checksums only the host arch's distfile,
+            # because DISTFILES is arch-conditional and this VM is amd64. The
+            # arm64 half of distinfo therefore goes unverified, even though
+            # ONLY_FOR_ARCHS lists aarch64. Nothing else checks it: a bad arm64
+            # entry from upstream-update.yml would first surface as a failed
+            # build on a Netgate ARM appliance. Fetch and check it here.
+            make checksum DNSCRYPT_ARCH=arm64
