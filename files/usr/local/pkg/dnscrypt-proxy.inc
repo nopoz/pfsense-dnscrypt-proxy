@@ -860,9 +860,70 @@ EOF;
 }
 
 /**
+ * Find services that will lose DNS resolution when this package goes away.
+ *
+ * Both documented setups point another service at our listener, and neither
+ * of those settings belongs to this package, so they survive the uninstall
+ * and leave the firewall forwarding into a dead port. The failure is delayed:
+ * cached answers keep working until their TTL expires.
+ *
+ * Returns an array of warning strings, empty when nothing depends on us.
+ */
+function dnscrypt_proxy_get_uninstall_warnings() {
+	$pkg_config = dnscrypt_proxy_get_config();
+	$port = !empty($pkg_config['listen_port']) ? $pkg_config['listen_port'] : '5300';
+	$warnings = array();
+
+	// Option A: DNS Resolver forwarding to us. Port 53 may be left implicit.
+	// config_path_enabled(), not !empty(): pfSense writes <enable></enable>,
+	// so the flag is an empty string whose presence is what means enabled.
+	$unbound = config_get_path('unbound', array());
+	if (config_path_enabled('unbound') && !empty($unbound['custom_options'])) {
+		$suffix = ($port == '53') ? '(?:@53)?' : '@' . preg_quote($port, '/');
+		$re = '/^\s*forward-addr:\s*(?:127\.0\.0\.1|::1)' . $suffix . '\s*$/mi';
+		if (preg_match($re, base64_decode($unbound['custom_options']))) {
+			$warnings[] =
+			    "WARNING: the DNS Resolver (Unbound) is forwarding to 127.0.0.1@{$port}, " .
+			    "which this package provided.\n" .
+			    "         That setting belongs to Unbound and is not removed with this " .
+			    "package, so name\n" .
+			    "         resolution will fail as cached answers expire.\n" .
+			    "         Fix: delete the forward-zone block from Services > DNS Resolver > " .
+			    "Custom options,\n" .
+			    "         then Save and Apply Changes.";
+		}
+	}
+
+	// Option B: system DNS pointed at us, which requires us on port 53.
+	if ($port == '53') {
+		foreach (config_get_path('system/dnsserver', array()) as $dnsserver) {
+			if (in_array($dnsserver, array('127.0.0.1', '::1'))) {
+				$warnings[] =
+				    "WARNING: System > General Setup lists {$dnsserver} as a DNS server and " .
+				    "this package was\n" .
+				    "         answering on port 53, so name resolution will fail as cached " .
+				    "answers expire.\n" .
+				    "         Fix: set a working DNS server in System > General Setup, or " .
+				    "re-enable the\n" .
+				    "         DNS Resolver.";
+				break;
+			}
+		}
+	}
+
+	return $warnings;
+}
+
+/**
  * Uninstall the package
  */
 function dnscrypt_proxy_deinstall() {
+	// Warn before the listener goes away, while the config is still readable.
+	foreach (dnscrypt_proxy_get_uninstall_warnings() as $warning) {
+		update_status("\n" . $warning . "\n");
+		log_error("[dnscrypt-proxy] " . str_replace("\n", " ", $warning));
+	}
+
 	// Stop the service
 	if (is_process_running("dnscrypt-proxy")) {
 		mwexec("/usr/bin/killall -q dnscrypt-proxy");
