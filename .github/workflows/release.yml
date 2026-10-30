@@ -76,7 +76,7 @@ jobs:
           echo "Bundled dnscrypt-proxy: ${UPSTREAM}"
 
       - name: Build package on FreeBSD
-        uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1  # v1.5.5
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc  # v1.5.9
         env:
           PORTVERSION: ${{ steps.version.outputs.version }}
         with:
@@ -137,7 +137,7 @@ jobs:
           subject-checksums: SHA256SUMS
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: pfSense-pkg-dnscrypt-proxy
           path: |
