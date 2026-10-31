@@ -179,6 +179,7 @@ function dnscrypt_proxy_get_defaults() {
 		'odoh_servers' => '',
 		'dnscrypt_ephemeral_keys' => '',
 		'tls_disable_session_tickets' => '',
+		'doh_check_cert_hashes_on_connect' => '',
 		'cert_refresh_delay' => '240',
 		'cache_neg_min_ttl' => '60',
 		'cache_neg_max_ttl' => '600',
@@ -233,6 +234,7 @@ function dnscrypt_proxy_get_all_fields() {
 		'force_tcp', 'http3', 'keepalive', 'lb_strategy',
 		'netprobe_timeout', 'netprobe_address', 'offline_mode',
 		'odoh_servers', 'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets',
+		'doh_check_cert_hashes_on_connect',
 		'disabled_server_names', 'cert_refresh_delay',
 		'cache_neg_min_ttl', 'cache_neg_max_ttl',
 		'blocked_query_response', 'reject_ttl',
@@ -254,7 +256,8 @@ function dnscrypt_proxy_get_tab_checkboxes() {
 		'cache' => array('cache', 'block_ipv6', 'block_unqualified', 'block_undelegated'),
 		'logging' => array('query_log'),
 		'advanced' => array('force_tcp', 'http3', 'offline_mode', 'odoh_servers',
-		                    'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets')
+		                    'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets',
+		                    'doh_check_cert_hashes_on_connect')
 	);
 }
 
@@ -464,6 +467,86 @@ function dnscrypt_proxy_strip_toml_keys($toml, $keys) {
 }
 
 /**
+ * Check a netprobe_address value: comma-separated IP:port entries, IPv6 as
+ * [address]:port. -check never parses it, and a bad entry stops the daemon at startup.
+ */
+function dnscrypt_proxy_valid_netprobe_address($value) {
+	$found = false;
+	foreach (explode(',', $value) as $entry) {
+		$entry = trim($entry);
+		if ($entry === '') {
+			continue;
+		}
+		if (!preg_match('/^(?:\[([0-9a-fA-F:.]+)\]|([0-9.]+)):(\d+)$/', $entry, $m)) {
+			return false;
+		}
+		$ip_ok = ($m[1] !== '') ? is_ipaddrv6($m[1]) : is_ipaddrv4($m[2]);
+		if (!$ip_ok || !is_port($m[3])) {
+			return false;
+		}
+		$found = true;
+	}
+	return $found;
+}
+
+/**
+ * Check the regex: rules of a name list. dnscrypt-proxy skips an invalid
+ * ordinary rule, but one bad regex rule stops the daemon at startup, and
+ * -check does not load lists. This mirrors upstream's parser (name_list.go);
+ * whether the expression compiles, and its cost limit, only upstream can tell.
+ */
+function dnscrypt_proxy_validate_regex_rules($label, $content, $schedules) {
+	$errors = array();
+	$count = 0;
+	foreach (explode("\n", $content) as $line_num => $line) {
+		$rule = ltrim(rtrim($line, "\r"), " \t");
+		if (strncasecmp($rule, 'regex:', 6) !== 0) {
+			continue;
+		}
+		$where = "{$label}, line " . ($line_num + 1);
+		if (++$count > 1000) {
+			$errors[] = "{$where}: too many regex rules, the limit is 1000 per list.";
+			break;
+		}
+		if (strncmp($rule, 'regex:', 6) !== 0) {
+			$errors[] = "{$where}: the regex keyword must be written in lowercase.";
+			continue;
+		}
+		if (!preg_match('/^regex:[ \t]*`([^`]*)`(.*)$/', $rule, $m)) {
+			$errors[] = "{$where}: expected an expression between backticks, such as regex: `^ads[0-9]*\.example\.com$`";
+			continue;
+		}
+		list(, $expr, $tail) = $m;
+		if ($expr === '') {
+			$errors[] = "{$where}: empty expression.";
+		} elseif (strlen($expr) > 1024) {
+			$errors[] = "{$where}: the expression is " . strlen($expr) . " bytes long, the limit is 1024.";
+		} elseif (preg_match('/[^\x20-\x7e]/', $expr)) {
+			$errors[] = "{$where}: the expression must be printable ASCII; write internationalized names in their xn-- form.";
+		}
+		if ($tail !== '' && $tail[0] !== ' ' && $tail[0] !== "\t") {
+			$errors[] = "{$where}: expected a space after the closing backtick (backticks cannot appear inside expressions).";
+			continue;
+		}
+		$tail = ltrim($tail, " \t");
+		if ($tail !== '' && $tail[0] === '@') {
+			if (!preg_match('/^@([^\s@#]+)(?:[ \t]+(.*))?$/', $tail, $sm)) {
+				$errors[] = "{$where}: expected one schedule name after @, then optionally a space and a # comment.";
+				continue;
+			}
+			if (!in_array($sm[1], $schedules, true)) {
+				$errors[] = "{$where}: schedule '{$sm[1]}' is not defined in Custom TOML.";
+			}
+			$tail = isset($sm[2]) ? $sm[2] : '';
+		}
+		if ($tail !== '' && $tail[0] !== '#') {
+			$errors[] = "{$where}: unexpected text after the expression.";
+		}
+	}
+	return $errors;
+}
+
+/**
  * Validate user input
  */
 function dnscrypt_proxy_validate($post, &$input_errors) {
@@ -554,21 +637,8 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 		}
 	}
 
-	if (!empty($post['netprobe_address'])) {
-		// Validate IP:port format
-		if (strpos($post['netprobe_address'], ':') !== false) {
-			$parts = explode(':', $post['netprobe_address']);
-			if (!is_ipaddr($parts[0])) {
-				$input_errors[] = "Network Probe Address must have a valid IP address.";
-			}
-			if (isset($parts[1]) && !is_port($parts[1])) {
-				$input_errors[] = "Network Probe Address must have a valid port.";
-			}
-		} else {
-			if (!is_ipaddr($post['netprobe_address'])) {
-				$input_errors[] = "Network Probe Address must be a valid IP address.";
-			}
-		}
+	if (!empty($post['netprobe_address']) && !dnscrypt_proxy_valid_netprobe_address($post['netprobe_address'])) {
+		$input_errors[] = "Network Probe Address must be one or more comma-separated IP:port entries, with IPv6 written as [address]:port.";
 	}
 
 	if (!empty($post['cert_refresh_delay'])) {
@@ -719,6 +789,18 @@ function dnscrypt_proxy_validate($post, &$input_errors) {
 				foreach ($check_errors as $err) {
 					$input_errors[] = "Custom TOML: {$err}";
 				}
+			}
+		}
+	}
+
+	// POST textareas are still raw text here, as with the anonymized DNS routes below
+	if ($current_tab == 'lists') {
+		$custom_toml = base64_decode(config_get_path('installedpackages/dnscryptproxy/config/0/custom_toml', ''));
+		preg_match_all('/^\s*\[\s*schedules\.["\']?([^\]"\']+?)["\']?\s*\]/m', $custom_toml, $sm);
+		foreach (array('blocked_names' => 'Blocked Domains', 'allowed_names' => 'Allowed Domains') as $field => $label) {
+			if (!empty($post[$field])) {
+				$input_errors = array_merge($input_errors,
+					dnscrypt_proxy_validate_regex_rules($label, $post[$field], $sm[1]));
 			}
 		}
 	}
@@ -1153,7 +1235,8 @@ function dnscrypt_proxy_import_toml($toml_content) {
 		'odoh_servers', 'require_dnssec', 'require_nolog', 'require_nofilter',
 		'ignore_system_dns', 'force_tcp', 'http3', 'offline_mode',
 		'cache', 'block_ipv6', 'block_unqualified', 'block_undelegated',
-		'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets'
+		'dnscrypt_ephemeral_keys', 'tls_disable_session_tickets',
+		'doh_check_cert_hashes_on_connect'
 	);
 
 	// Numeric/string fields that map directly
@@ -1369,12 +1452,8 @@ function dnscrypt_proxy_import_toml($toml_content) {
 		}
 	}
 
-	// Netprobe address: IP or IP:port
-	if (!empty($config['netprobe_address'])) {
-		$npa = $config['netprobe_address'];
-		if (!preg_match('/^[0-9a-fA-F.:]+$/', $npa)) {
-			$errors[] = "Invalid network probe address: " . htmlspecialchars($npa);
-		}
+	if (!empty($config['netprobe_address']) && !dnscrypt_proxy_valid_netprobe_address($config['netprobe_address'])) {
+		$errors[] = "Invalid network probe address: " . htmlspecialchars($config['netprobe_address']);
 	}
 
 	// If validation failed, don't write to config.xml
@@ -1684,6 +1763,7 @@ function dnscrypt_proxy_generate_toml() {
 	// Boolean settings - Security/privacy
 	$dnscrypt_ephemeral_keys = isset($pkg_config['dnscrypt_ephemeral_keys']) && $pkg_config['dnscrypt_ephemeral_keys'] == 'on' ? 'true' : 'false';
 	$tls_disable_session_tickets = isset($pkg_config['tls_disable_session_tickets']) && $pkg_config['tls_disable_session_tickets'] == 'on' ? 'true' : 'false';
+	$doh_check_cert_hashes_on_connect = isset($pkg_config['doh_check_cert_hashes_on_connect']) && $pkg_config['doh_check_cert_hashes_on_connect'] == 'on' ? 'true' : 'false';
 
 	// Handle defaults when not set
 	if (!isset($pkg_config['ipv4_servers'])) $ipv4_servers = 'true';
@@ -1818,6 +1898,7 @@ offline_mode = {$offline_mode}
 # Security and privacy
 dnscrypt_ephemeral_keys = {$dnscrypt_ephemeral_keys}
 tls_disable_session_tickets = {$tls_disable_session_tickets}
+doh_check_cert_hashes_on_connect = {$doh_check_cert_hashes_on_connect}
 
 # Certificate handling
 cert_refresh_delay = {$cert_refresh_delay}

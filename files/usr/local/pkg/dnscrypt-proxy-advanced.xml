@@ -146,7 +146,12 @@
 		<field>
 			<fielddescr>Network Probe Address</fielddescr>
 			<fieldname>netprobe_address</fieldname>
-			<description>Address used to test network connectivity at startup. Default: 9.9.9.9:53</description>
+			<description>
+				<![CDATA[
+				Address used to test network connectivity at startup, as IP:port. Several can be given, comma-separated.<br/>
+				Write IPv6 as <code>[2620:fe::fe]:53</code>. Default: 9.9.9.9:53
+				]]>
+			</description>
 			<type>input</type>
 			<size>30</size>
 			<default_value>9.9.9.9:53</default_value>
@@ -182,6 +187,17 @@
 			<fielddescr>Disable TLS Session Tickets</fielddescr>
 			<fieldname>tls_disable_session_tickets</fieldname>
 			<description>Disable TLS session tickets for improved privacy at the cost of slight performance reduction.</description>
+			<type>checkbox</type>
+		</field>
+		<field>
+			<fielddescr>Check DoH Certificates on Connect</fielddescr>
+			<fieldname>doh_check_cert_hashes_on_connect</fieldname>
+			<description>
+				<![CDATA[
+				Check DoH server certificates against the hashes in their stamps on every new connection, not only at startup and on certificate reload.<br/>
+				More secure, but raises the risk of downtime unless DNSCrypt servers are enabled alongside DoH.
+				]]>
+			</description>
 			<type>checkbox</type>
 		</field>
 		<field>
