@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-dnscrypt-proxy
-PORTVERSION=	1.2.12
+PORTVERSION=	1.2.13
 CATEGORIES=	dns
 
 MAINTAINER=	bill.lowney@gmail.com

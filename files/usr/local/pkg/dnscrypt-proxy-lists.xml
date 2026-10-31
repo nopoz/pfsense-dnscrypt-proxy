@@ -77,10 +77,12 @@
 			<fieldname>blocked_names</fieldname>
 			<description>
 				<![CDATA[
-				Domains to block (one per line). Supports wildcards.<br/>
+				Domains to block (one per line). Supports wildcards and regex rules.<br/>
 				Example:<br/>
 				<code>ads.example.com</code><br/>
-				<code>*.tracking.com</code>
+				<code>*.tracking.com</code><br/>
+				<code>regex: `^ads[0-9]*\.example\.com$`</code><br/>
+				Regex rules are case-insensitive. Unlike other rules, an invalid one stops the service from starting.
 				]]>
 			</description>
 			<type>textarea</type>
@@ -97,7 +99,7 @@
 			<fieldname>allowed_names</fieldname>
 			<description>
 				<![CDATA[
-				Domains to always allow (bypass blocking). One per line.<br/>
+				Domains to always allow (bypass blocking). One per line. Same syntax as Blocked Domains, including regex rules.<br/>
 				These take priority over blocked domains.
 				]]>
 			</description>
