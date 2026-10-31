@@ -16,6 +16,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write  # dispatch this repo's own gates; see the final step
 
 env:
   UPSTREAM_REPO: DNSCrypt/dnscrypt-proxy
@@ -167,3 +168,18 @@ jobs:
             That triggers the FreeBSD build/release workflow.
           labels: upstream-update
           delete-branch: true
+
+      # A pull_request raised by GITHUB_TOKEN parks at action_required and never
+      # runs, so an automated PR reads as mergeable while nothing has gated it.
+      # workflow_dispatch is the documented exception that always creates a run,
+      # so the gates are dispatched explicitly. Their check runs attach to the
+      # branch head, the commit the PR is reviewed at.
+      - name: Trigger gates on the new branch
+        if: steps.versions.outputs.update_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: upstream/dnscrypt-${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+          gh workflow run ci.yml          --ref "${BRANCH}"
+          gh workflow run ports-check.yml --ref "${BRANCH}"
