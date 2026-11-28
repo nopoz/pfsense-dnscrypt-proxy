@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-dnscrypt-proxy
-PORTVERSION=	1.2.13
+PORTVERSION=	1.2.14
 CATEGORIES=	dns
 
 MAINTAINER=	bill.lowney@gmail.com
@@ -13,7 +13,7 @@ LICENSE_FILE=	${WRKSRC}/LICENSE
 # The daemon is not built here: upstream publishes signed, statically linked
 # FreeBSD binaries per release, and they are fetched and checksum-pinned by
 # distinfo rather than committed to the tree.
-DNSCRYPT_VERSION=	2.1.20
+DNSCRYPT_VERSION=	2.1.21
 MASTER_SITES=	https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/
 
 ONLY_FOR_ARCHS=	amd64 aarch64
